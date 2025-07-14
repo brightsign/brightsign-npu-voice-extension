@@ -1,0 +1,156 @@
+#!/bin/bash
+### BEGIN INIT INFO
+# Provides:          bsext-gaze
+# Required-Start:    $remote_fs $syslog
+# Required-Stop:     $remote_fs $syslog
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 1 6
+# Short-Description: BrightSign Gaze Detection Extension
+# Description:       Runs the BrightSign NPU-based gaze detection service
+### END INIT INFO
+
+# Source function library if it exists
+[ -f /etc/init.d/functions ] && . /etc/init.d/functions
+
+SCRIPT_PATH=$(dirname $(realpath $0))
+DAEMON_NAME="bsext-gaze"
+PIDFILE="/var/run/${DAEMON_NAME}.pid"
+
+# defaults -- these can be overridden by the registry
+DISABLE_AUTO_START=false
+
+# Common setup function to determine SOC model and video device
+get_soc_name() {
+    # figure out the SOC model -- default to RK3588
+    SOC_NAME=RK3588
+    if [ -f /sys/firmware/devicetree/base/compatible ]; then
+        # Use strings command to handle null bytes in devicetree properly
+        COMPATIBLE=$(strings /sys/firmware/devicetree/base/compatible)
+        
+        # Look for rockchip,rk3588 pattern in the compatible string
+        if echo "$COMPATIBLE" | grep -q "rockchip,rk3588"; then
+            SOC_NAME="RK3588"
+        fi
+        # Look for rockchip,rk3568 pattern in the compatible string
+        if echo "$COMPATIBLE" | grep -q "rockchip,rk3568"; then
+            SOC_NAME="RK3568"
+        fi
+    else
+        echo "WARNING: Unable to determine SOC model, EXITING"
+        exit 1
+    fi
+
+    # Return the SOC model
+    echo "${SOC_NAME}"
+}
+
+get_video_device() {
+    SOC_NAME=$(get_soc_name)
+    # For  RK3588 models
+    if [ "${SOC_NAME}" = "RK3588" ]; then
+        VID_DEVID=/dev/video1
+    else
+    # all others
+        VID_DEVID=/dev/video0
+    fi
+
+    # check registry for video device
+    # allows user to override the default video device
+    reg_video_device=$(registry extension ${DAEMON_NAME}-video-device)
+    if [ -n "${reg_video_device}" ]; then
+        VID_DEVID=${reg_video_device}
+    fi
+
+    # Return the video device
+    echo "${VID_DEVID}"
+}
+
+get_usb_audio_device() {
+    # Use arecord and awk to find first USB Audio ALSA hw string (e.g., "hw:3,0")
+    local alsa_device
+    alsa_device=$(arecord -l | awk '
+        /USB Audio/ {
+          for(i=1;i<=NF;i++) {
+            if($i=="card") { card=$(i+1); sub(/:/,"",card); }
+            if($i=="device") { dev=$(i+1); sub(/:/,"",dev); }
+          }
+          print "hw:"card","dev; exit
+        }'
+    )
+    echo "$alsa_device"
+}
+
+# Common function to run the attention demo
+run_attention_demo() {
+    # Get command arguments from setup function
+    # CMD_ARGS=$(get_runtime_args)
+    # echo "Using Model and Device: ${CMD_ARGS}"
+
+    SOC_NAME=$(get_soc_name)
+    SOC_HOME=${SCRIPT_PATH}/${SOC_NAME}
+    cd ${SOC_HOME}
+
+    CMD_ARGS="${SOC_HOME}/model/RetinaFace.rknn $(get_video_device) $(get_usb_audio_device)"
+    echo "Using Model and Device: ${CMD_ARGS}"
+    
+    # Default to running in foreground
+    local background=$1
+    
+    export LD_LIBRARY_PATH=./lib:$LD_LIBRARY_PATH
+    if [ "$background" = "true" ]; then
+        # Run as a daemon in the background
+        start-stop-daemon --start --background --make-pidfile --pidfile ${PIDFILE} \
+                          --exec ${SOC_HOME}/attention_demo -- ${CMD_ARGS}
+    else
+        # Run directly in foreground
+        ${SOC_HOME}/attention_demo ${CMD_ARGS}
+    fi
+}
+
+do_start() {
+    # check registry for auto-start
+    reg_disable_auto_start=$(registry extension ${DAEMON_NAME}-disable-auto-start)
+    if [ -n "${reg_disable_auto_start}" ]; then
+        DISABLE_AUTO_START=${reg_disable_auto_start}
+    fi
+
+    if [ "${DISABLE_AUTO_START}" = "true" ]; then
+        echo "Auto-start is disabled for ${DAEMON_NAME}"
+        return
+    fi
+
+    # Start the attention_demo process as a daemon
+    run_attention_demo true
+}
+
+do_stop() {
+    start-stop-daemon --stop --pidfile ${PIDFILE}
+    rm -f ${PIDFILE}
+}
+
+case "$1" in
+    start)
+        echo "Starting ${DAEMON_NAME}"
+        do_start
+        ;;
+    stop)
+        echo "Stopping ${DAEMON_NAME}"
+        do_stop
+        ;;
+    restart)
+        echo "Restarting ${DAEMON_NAME}"
+        do_stop
+        do_start
+        ;;
+    run)
+        echo "Running ${DAEMON_NAME} in foreground"
+        # Run directly in foreground (not as daemon)
+        run_attention_demo false
+        ;;
+    *)
+        echo "Usage: $0 {start|stop|restart|run}"
+        exit 1
+        ;;
+esac
+
+exit 0
