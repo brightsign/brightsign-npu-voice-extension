@@ -13,12 +13,16 @@ TOOLCHAIN_HOST_TASK = "\
     packagegroup-cross-canadian-${MACHINE} \
     nativesdk-python-modules \
 "
+DEPENDS += "libfvad"
 
 TOOLCHAIN_TARGET_TASK += "\
     libstdc++ \
     libmicrohttpd \
     opencv \
     rockchip-rga \
+    libfvad \
+    libsndfile \
+    fftw \
 "
 
 # The filename ends up with "toolchain" in it later (via
