@@ -4,9 +4,8 @@ HOMEPAGE = "https://github.com/dpirch/libfvad"
 LICENSE = "BSD-3-Clause"
 LIC_FILES_CHKSUM = "file://LICENSE;md5=38c1c1f8ecdbde8e86a2eb9f697b5f06"
 
-SRC_URI = "git://github.com/dpirch/libfvad.git;branch=master \
-  file://0001-install-static-lib.patch \
-"
+SRC_URI = "git://github.com/dpirch/libfvad.git;branch=master"
+
 SRCREV = "532ab666c20d3cfda38bca63abbb0f152706c369"
 
 S = "${WORKDIR}/git"
