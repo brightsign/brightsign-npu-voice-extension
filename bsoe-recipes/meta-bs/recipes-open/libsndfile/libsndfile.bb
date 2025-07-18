@@ -2,7 +2,7 @@ SUMMARY = "C library for reading and writing files containing sampled sound"
 DESCRIPTION = "libsndfile is a library of C routines for reading and writing files containing sampled sound (such as MS Windows WAV and the Apple/SGI AIFF format) through one standard library interface."
 HOMEPAGE = "http://libsndfile.github.io/libsndfile/"
 LICENSE = "LGPL-2.1"
-LIC_FILES_CHKSUM = "file://COPYING;md5=2d5025d4aa3495befef8f17206a5b0a1"
+LIC_FILES_CHKSUM = "file://COPYING;md5=e77fe93202736b47c07035910f47974a"
 
 SRC_URI = "git://github.com/libsndfile/libsndfile.git;branch=master;protocol=https"
 SRCREV = "52b803f57a1f4d23471f5c5f77e1a21e0721ea0e"

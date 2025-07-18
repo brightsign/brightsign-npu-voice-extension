@@ -168,8 +168,8 @@ The platform SDK can be built from public sources. Browse OS releases from the [
 # Download BrightSign OS and extract
 cd "${project_root:-.}"
 
-export BRIGHTSIGN_OS_MAJOR_VERION=9.0
-export BRIGHTSIGN_OS_MINOR_VERION=189
+export BRIGHTSIGN_OS_MAJOR_VERION=9.1
+export BRIGHTSIGN_OS_MINOR_VERION=52
 export BRIGHTSIGN_OS_VERSION=${BRIGHTSIGN_OS_MAJOR_VERION}.${BRIGHTSIGN_OS_MINOR_VERION}
 
 wget https://brightsignbiz.s3.amazonaws.com/firmware/opensource/${BRIGHTSIGN_OS_MAJOR_VERION}/${BRIGHTSIGN_OS_VERSION}/brightsign-${BRIGHTSIGN_OS_VERSION}-src-dl.tar.gz
@@ -225,7 +225,7 @@ You can access the SDK from BrightSign.  The SDK is a shell script that will ins
 cd "${project_root:-}"
 
 # copy the SDK to the project root
-cp brightsign-oe/build/tmp-glibc/deploy/sdk/brightsign-x86_64-cobra-toolchain-9.0.189.sh ./
+cp brightsign-oe/build/tmp-glibc/deploy/sdk/brightsign-x86_64-cobra-toolchain-9.1.52.sh ./
 
 # can safely remove the source if you want to save space
 #rm -rf brightsign-oe
@@ -234,7 +234,7 @@ cp brightsign-oe/build/tmp-glibc/deploy/sdk/brightsign-x86_64-cobra-toolchain-9.
 ```sh
 cd "${project_root:-.}"
 
-./brightsign-x86_64-cobra-toolchain-9.0.189.sh  -d ./sdk -y
+./brightsign-x86_64-cobra-toolchain-9.1.52.sh  -d ./sdk -y
 # installs the sdk to ./sdk
 ```
 

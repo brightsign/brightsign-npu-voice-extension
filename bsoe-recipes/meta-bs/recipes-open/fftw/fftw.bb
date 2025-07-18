@@ -1,7 +1,7 @@
 SUMMARY = "FFTW3 (Fastest Fourier Transform in the West), single-precision (float) library"
 HOMEPAGE = "http://www.fftw.org/"
 LICENSE = "GPL-2.0"
-LIC_FILES_CHKSUM = "file://COPYING;md5=751419260aa954499f7abaabaa882bbe"
+LIC_FILES_CHKSUM = "file://COPYING;md5=59530bdf33659b29e73d4adb9f9f6552"
 
 PV = "3.3.10"
 
