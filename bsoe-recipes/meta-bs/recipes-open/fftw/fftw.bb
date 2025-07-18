@@ -14,15 +14,20 @@ EXTRA_OECONF = "--enable-float --enable-static --disable-shared --disable-fortra
 # Do not build shared libraries
 PACKAGECONFIG = ""
 
-# Only install .a and headers, no shared objects
-FILES:${PN}-dev += "${libdir}/libfftw3f.a ${includedir}"
-
 ALLOW_EMPTY:${PN} = "1"
 
 inherit autotools pkgconfig
 
+EXTRA_OECMAKE = "-DBUILD_SHARED_LIBS=OFF"
 do_install:append() {
     install -d ${D}${includedir}
     install -m 0644 ${S}/api/fftw3.h ${D}${includedir}/
+    install -d ${D}${libdir}
+    install -m 0644 ${B}/.libs/libfftw3f.a ${D}${libdir}/
 }
+ALLOW_EMPTY:${PN} = "1"
+FILES:${PN} = ""
+INSANE_SKIP:${PN}-dev = "staticdev"
+# Only install static library and header in -dev
+FILES:${PN}-dev = "${libdir}/libfftw3.a ${includedir}"
 

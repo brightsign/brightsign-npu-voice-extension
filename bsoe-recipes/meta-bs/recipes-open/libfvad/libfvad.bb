@@ -5,20 +5,23 @@ LICENSE = "BSD-3-Clause"
 LIC_FILES_CHKSUM = "file://LICENSE;md5=38c1c1f8ecdbde8e86a2eb9f697b5f06"
 
 SRC_URI = "git://github.com/dpirch/libfvad.git;branch=master"
-
 SRCREV = "532ab666c20d3cfda38bca63abbb0f152706c369"
 
 S = "${WORKDIR}/git"
 
 inherit cmake
 
-# If you want only static, disable shared
 EXTRA_OECMAKE = "-DBUILD_SHARED_LIBS=OFF"
 
 do_install:append() {
     install -d ${D}${libdir}
+    install -m 0644 ${B}/src/libfvad.a ${D}${libdir}/
     install -d ${D}${includedir}
-
+    install -m 0644 ${S}/include/fvad.h ${D}${includedir}/
 }
-# Install static library and header in the -dev package (for SDK!)
-FILES_${PN}-dev += "${libdir}/libfvad.a ${includedir}/fvad.h"
+ALLOW_EMPTY:${PN} = "1"
+FILES:${PN} = ""
+INSANE_SKIP:${PN}-dev = "staticdev"
+# Only install static library and header in -dev
+FILES:${PN}-dev = "${libdir}/libfvad.a ${includedir}/fvad.h"
+

@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-name=npu_gaze
+name=npu_voice
 mapper_vol_name=ext_${name}
 tmp_vol_name=tmp_${name}
 mount_name=ext_${name}

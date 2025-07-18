@@ -20,11 +20,13 @@ TOOLCHAIN_TARGET_TASK += "\
     libmicrohttpd \
     opencv \
     rockchip-rga \
-    libfvad \
-    libsndfile \
-    fftw \
+    libfvad-dev \
+    libfvad-staticdev \
+    libsndfile-dev \
+    libsndfile-staticdev \
+    fftw-dev \
+    fftw-staticdev \
 "
-
 # The filename ends up with "toolchain" in it later (via
 # TOOLCHAIN_OUTPUTNAME) so we don't really need to say "sdk".
 SDK_NAME_PREFIX = "brightsign"

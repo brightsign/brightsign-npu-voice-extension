@@ -296,6 +296,10 @@ mkdir -p examples/RetinaFace/model/RK3588
 pushd examples/RetinaFace/model
 chmod +x ./download_model.sh && ./download_model.sh
 popd
+mkdir -p examples/whisper/model/RK3588
+pushd examples/whisper/model
+chmod +x ./download_model.sh && ./download_model.sh
+popd
 ```
 
 Compile the model.  Note the opetion for various SoCs.
@@ -312,16 +316,12 @@ docker run -it --rm -v $(pwd):/zoo rknn_tk2 /bin/bash \
 docker run -it --rm -v $(pwd):/zoo rknn_tk2 /bin/bash \
     -c "cd /zoo/examples/whisper/python && python convert.py ../model/whisper_encoder_base_20s.onnx rk3588 fp ../model/RK3588/whisper_encoder_base_20s.rknn"
 # move the generated model to the right place
-# mkdir -p ../../install/model/RK3588
-# cp examples/RetinaFace/model/RK3588/RetinaFace.rknn ../../install/model/RK3588/
-# cp examples/whisper/model/RK3588/whisper.rknn ../../install/model/RK3588/
-
-# mkdir -p ../../install/RK3588/model
-# cp examples/RetinaFace/model/RK3588/RetinaFace.rknn ../../install/RK3588/model/
-# cp examples/whisper/model/RK3588/whisper_encoder_base_20s.rknn ../../install/RK3588/model/
-# cp examples/whisper/model/RK3588/whisper_decoder_base_20s.rknn ../../install/RK3588/model/
-# cp examples/whisper/model/mel_80_filters.txt ../../install/RK3588/model/
-# cp examples/whisper/model/vocab_en.txt ../../install/RK3588/model/
+mkdir -p ../../install/RK3588/model
+cp examples/RetinaFace/model/RK3588/RetinaFace.rknn ../../install/RK3588/model/
+cp examples/whisper/model/RK3588/whisper_encoder_base_20s.rknn ../../install/RK3588/model/
+cp examples/whisper/model/RK3588/whisper_decoder_base_20s.rknn ../../install/RK3588/model/
+cp examples/whisper/model/mel_80_filters.txt ../../install/RK3588/model/
+cp examples/whisper/model/vocab_en.txt ../../install/RK3588/model/
 ```
 
 ```sh
@@ -339,14 +339,14 @@ docker run -it --rm -v $(pwd):/zoo rknn_tk2 /bin/bash \
 docker run -it --rm -v $(pwd):/zoo rknn_tk2 /bin/bash \
     -c "cd /zoo/examples/whisper/python && python convert.py ../model/whisper_encoder_base_20s.onnx rk3568 fp ../model/RK3588/whisper_encoder_base_20s.rknn"
 
+# move the generated model to the right place
 mkdir -p ../../install/RK3568/model
-# cp examples/RetinaFace/model/RK3568/RetinaFace.rknn ../../model/RK3568/
-# cp examples/whisper/model/RK3588/whisper.rknn ../../install/model/RK3568/
-# cp examples/RetinaFace/model/RK3568/RetinaFace.rknn ../../install/RK3568/model/
-# cp examples/whisper/model/RK3588/whisper_encoder_base_20s.rknn ../../install/RK3568/model/
-# cp examples/whisper/model/RK3588/whisper_decoder_base_20s.rknn ../../install/RK3568/model/
-# cp examples/whisper/model/mel_80_filters.txt ../../install/RK3568/model/
-# cp examples/whisper/model/vocab_en.txt ../../install/RK3568/model/
+cp examples/RetinaFace/model/RK3568/RetinaFace.rknn ../../install/RK3568/model/
+cp examples/whisper/model/RK3568/whisper_encoder_base_20s.rknn ../../install/RK3568/model/
+cp examples/whisper/model/RK3568/whisper_decoder_base_20s.rknn ../../install/RK3568/model/
+cp examples/whisper/model/mel_80_filters.txt ../../install/RK3568/model/
+cp examples/whisper/model/vocab_en.txt ../../install/RK3568/model/
+
 ```
 
 **The necessary binaries (model, libraries) are now in the `install` directory of the project**

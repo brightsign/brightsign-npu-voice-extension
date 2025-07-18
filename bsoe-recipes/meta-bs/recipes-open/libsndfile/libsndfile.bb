@@ -22,14 +22,15 @@ EXTRA_OECMAKE = "\
     -DBUILD_SHARED_LIBS=OFF \
 "
 
-# Make sure the runtime package exists, even if empty
-ALLOW_EMPTY:${PN} = "1"
-
-# Only install static lib (.a) and headers in -dev
-FILES:${PN}-dev += "${libdir}/libsndfile.a ${includedir}"
-
 do_install:append() {
+    install -d ${D}${libdir}
+    install -m 0644 ${B}/libsndfile.a ${D}${libdir}/
     install -d ${D}${includedir}
     install -m 0644 ${S}/include/sndfile.h ${D}${includedir}/
 }
+ALLOW_EMPTY:${PN} = "1"
+FILES:${PN} = ""
+INSANE_SKIP:${PN}-dev = "staticdev"
+# Only install static library and header in -dev
+FILES:${PN}-dev = "${libdir}/libsndfile.a ${includedir}/sndfile.h"
 
