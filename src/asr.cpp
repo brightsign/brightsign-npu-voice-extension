@@ -5,9 +5,11 @@
 #include <sndfile.h>
 #include <alsa/asoundlib.h>
 #include <fvad.h>
+#include <iomanip>
 
 ASRThread::ASRThread(
-    ThreadSafeQueue<InferenceResult>& queue,
+    ThreadSafeQueue<InferenceResult>& jsonQueue,
+    ThreadSafeQueue<InferenceResult>& bsvarQueue,
     std::atomic<bool>& isRunning,
     std::atomic<bool>& triggerFlag,
     std::mutex& gaze_mutex_,
@@ -18,7 +20,8 @@ ASRThread::ASRThread(
     int channels,
     int record_seconds,
     std::string alsa_device_)
-    : resultQueue(queue),
+    : jsonResultQueue(jsonQueue),
+      bsvarResultQueue(bsvarQueue),
       running(isRunning),
       asr_trigger(triggerFlag),
       gaze_mutex(gaze_mutex_),
@@ -76,7 +79,8 @@ ASRThread::~ASRThread() {
         printf("release_ppocr_model decoder_context fail! ret=%d\n", ret);
     }
     running = false;
-    resultQueue.signalShutdown();
+    jsonResultQueue.signalShutdown();
+    bsvarResultQueue.signalShutdown();
 }
 
 bool record_on_vad(const std::string& device, const std::string& wav_path) {
@@ -128,7 +132,6 @@ bool record_on_vad(const std::string& device, const std::string& wav_path) {
     int allowed_silence = 50;
     int min_samples = 32000; // 2 second minimum
     int total_frames = 0;
-
     while (speech_frames < max_speech_frames) {
         int r = snd_pcm_readi(pcm_handle, frame.data(), FRAME_LEN);
         if (r < 0) {
@@ -173,7 +176,6 @@ bool record_on_vad(const std::string& device, const std::string& wav_path) {
         snd_pcm_close(pcm_handle);
         return false;
     }
-
     SF_INFO sfinfo = {};
     sfinfo.samplerate = SAMPLE_RATE;
     sfinfo.channels = CHANNELS;
@@ -195,7 +197,6 @@ bool record_on_vad(const std::string& device, const std::string& wav_path) {
     if (written != static_cast<sf_count_t>(recorded_samples.size()/CHANNELS)) {
         std::cerr << "Warning: only wrote " << written << " of " << recorded_samples.size()/CHANNELS << " frames!\n";
     }
-    std::cout << "Saved " << written << " frames to " << wav_path << std::endl;
     return written > 0;
 }
 
@@ -276,7 +277,6 @@ bool alsa_record_wav(const std::string& alsa_device,
         return false;
     }
 
-    std::cout << "Saved to " << wav_path << std::endl;
     return true;
 }
 
@@ -291,11 +291,9 @@ InferenceResult ASRThread::runASR() {
     float infer_time = 0.0;
     float audio_length = 0.0;
     float rtf = 0.0;
-    
     bool vad_detected = record_on_vad(alsa_device, "/tmp/capture.wav");
     if(!vad_detected)
     {
-        //std::cout<<"No VAD detected"<<std::endl;
         result.asr ="";
         return result;
     }
@@ -322,13 +320,14 @@ InferenceResult ASRThread::runASR() {
             printf("resample audio fail! ret=%d\n", ret);
         }
     }
+    timer.tik();
     audio_preprocess(&audio, mel_filters.data(), audio_data);
     ret = inference_whisper_model(&rknn_app_ctx, audio_data, mel_filters.data(), vocab, task_code, recognized_text);
     if (ret != 0)
     {
         printf("inference_whisper_model fail! ret=%d\n", ret);
     }
-
+    timer.tok();
     // print result
     std::cout << "\nWhisper output: ";
     for (const auto &str : recognized_text)
@@ -358,12 +357,17 @@ void ASRThread::operator()() {
             }
             else
             {
-                //std::cout << "[ASRThread] received ASR: " << result.asr<<std::endl;
-                resultQueue.push(std::move(result));
+		// Fix update count_all_faces_in_frame from inference thread.
+		result.num_faces_attending = 1;
+		result.count_all_faces_in_frame = 1;
+		result. timestamp = std::chrono::system_clock::now();
+		InferenceResult bsresult(result);
+                jsonResultQueue.push(std::move(result));
+                bsvarResultQueue.push(std::move(bsresult));
             }
             trigger_asr = false;
 	    asr_busy = false;
             lock.unlock();
-        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        //std::this_thread::sleep_for(std::chrono::milliseconds(50));
     }
 }

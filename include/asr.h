@@ -18,7 +18,8 @@
 
 class ASRThread {
 private:
-    ThreadSafeQueue<InferenceResult>& resultQueue;
+    ThreadSafeQueue<InferenceResult>& jsonResultQueue;
+    ThreadSafeQueue<InferenceResult>& bsvarResultQueue;
     std::atomic<bool>& running;
     std::atomic<bool>& asr_trigger;
     std::string asr_model_path;
@@ -43,7 +44,8 @@ private:
 
 public:
     ASRThread(
-        ThreadSafeQueue<InferenceResult>& queue,
+        ThreadSafeQueue<InferenceResult>& jsonQueue,
+        ThreadSafeQueue<InferenceResult>& bsvarQueue,
         std::atomic<bool>& isRunning,
         std::atomic<bool>& triggerFlag,
 	std::mutex& gaze_mutex,

@@ -9,6 +9,8 @@ std::string JsonMessageFormatter::formatMessage(const InferenceResult& result) {
     j["faces_in_frame_total"] = result.count_all_faces_in_frame;
     j["faces_attending"] = result.num_faces_attending;
     j["timestamp"] = std::chrono::system_clock::to_time_t(result.timestamp);
+    j["ASR"] = result.asr;
+
     return j.dump();
 }
 
@@ -18,15 +20,9 @@ std::string BSVariableMessageFormatter::formatMessage(const InferenceResult& res
     std::string message = 
         "faces_attending:" + std::to_string(result.num_faces_attending) + "!!" + 
         "faces_in_frame_total:" + std::to_string(result.count_all_faces_in_frame) + "!!" +
+        "ASR:" + result.asr + "!!" +
         "timestamp:" + std::to_string(std::chrono::system_clock::to_time_t(result.timestamp));
     return message;
-}
-
-// Implementation of the AsrMessageFormatter
-std::string AsrMessageFormatter::formatMessage(const InferenceResult& result) {
-    json j;
-    j["ASR"] = result.asr;
-    return j.dump();
 }
 
 UDPPublisher::UDPPublisher(

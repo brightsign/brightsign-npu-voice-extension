@@ -20,13 +20,14 @@ struct InferenceResult {
     // std::string label;
     int count_all_faces_in_frame;
     int num_faces_attending;
-    std::chrono::system_clock::time_point timestamp;
     std::string asr;
+    std::chrono::system_clock::time_point timestamp;
 };
 
 class MLInferenceThread {
 private:
-    ThreadSafeQueue<InferenceResult>& resultQueue;
+    ThreadSafeQueue<InferenceResult>& jsonResultQueue;
+    ThreadSafeQueue<InferenceResult>& bsvarResultQueue;
     std::atomic<bool>& running;
     int target_fps;
     rknn_app_context_t rknn_app_ctx;
@@ -41,15 +42,16 @@ private:
 
 public:
     MLInferenceThread(
-        const char* model_path,
-        const char* source_name,
-        ThreadSafeQueue<InferenceResult>& queue, 
+	const char* model_path,
+	const char* source_name,
+	ThreadSafeQueue<InferenceResult>& jsonQueue,
+	ThreadSafeQueue<InferenceResult>& bsvarQueue,
 	std::mutex& gaze_mutex,
 	std::condition_variable& gaze_cv,
 	bool& trigger_asr,
 	std::atomic<bool>& asr_busy,
-        std::atomic<bool>& isRunning,
-        int target_fps);
+	std::atomic<bool>& isRunning,
+	int target_fps);
     ~MLInferenceThread(); // Destructor declaration
     void operator()();
 };

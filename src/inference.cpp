@@ -25,7 +25,7 @@ InferenceResult MLInferenceThread::runInference(cv::Mat& cap) {
     memset(&image, 0, sizeof(image));
     cv_to_image_buffer(cap, &image);
 
-    InferenceResult final_result{-1, -1, std::chrono::system_clock::now()};
+    InferenceResult final_result{-1, -1, "", std::chrono::system_clock::now()};
 
     retinaface_result result;
     int ret = inference_retinaface_model(&rknn_app_ctx, 
@@ -72,14 +72,16 @@ InferenceResult MLInferenceThread::runInference(cv::Mat& cap) {
 MLInferenceThread::MLInferenceThread(
         const char* model_path,
         const char* source_name,
-        ThreadSafeQueue<InferenceResult>& queue, 
+        ThreadSafeQueue<InferenceResult>& jsonQueue,
+        ThreadSafeQueue<InferenceResult>& bsvarQueue,
         std::mutex& gaze_mutex_,
         std::condition_variable& gaze_cv_,
         bool& trigger_asr_,
         std::atomic<bool>& asr_busy_,
         std::atomic<bool>& isRunning,
         int target_fps=5)
-    : resultQueue(queue),
+    : jsonResultQueue(jsonQueue),
+      bsvarResultQueue(bsvarQueue),
       gaze_mutex(gaze_mutex_),
       gaze_cv(gaze_cv_),
       trigger_asr(trigger_asr_),
@@ -135,7 +137,8 @@ MLInferenceThread::~MLInferenceThread() {
     }  
 
     running = false;
-    resultQueue.signalShutdown();
+    jsonResultQueue.signalShutdown();
+    bsvarResultQueue.signalShutdown();
 }
 
 void MLInferenceThread::operator()() {
@@ -176,7 +179,8 @@ void MLInferenceThread::operator()() {
         }
 
         InferenceResult result = runInference(captured_img);
-	
+        //jsonResultQueue.push(std::move(result));
+        //bsvarResultQueue.push(std::move(result));
 	if(result.num_faces_attending > 0 && !asr_busy)
 	{
 	    std::unique_lock<std::mutex> lock(gaze_mutex);

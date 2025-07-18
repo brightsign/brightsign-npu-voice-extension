@@ -26,7 +26,8 @@
 #include <condition_variable>
 
 std::atomic<bool> running{true};
-ThreadSafeQueue<InferenceResult> resultQueue(1);
+ThreadSafeQueue<InferenceResult> jsonResultQueue(1);
+ThreadSafeQueue<InferenceResult> bsvarResultQueue(1);
 
 std::atomic<bool> asr_trigger{false};
 std::mutex gaze_mutex;
@@ -39,7 +40,8 @@ void signalHandler(int signum) {
 
     // Cleanup and shutdown
     running = false;
-    resultQueue.signalShutdown();
+    jsonResultQueue.signalShutdown();
+    bsvarResultQueue.signalShutdown();
 }
 
 int main(int argc, char **argv) {
@@ -57,36 +59,46 @@ int main(int argc, char **argv) {
     std::string audio_device = "plug" + std::string(argv[3]);
 
     MLInferenceThread mlThread(
-        model_name,
-        source_name,
-        resultQueue, 
+	model_name,
+	source_name,
+	jsonResultQueue,
+	bsvarResultQueue,
 	gaze_mutex,
 	gaze_cv,
 	trigger_asr,
 	asr_busy,
-        running,
-        30);
+	running,
+	30);
 
-    auto asr_formatter = std::make_shared<AsrMessageFormatter>();
-    UDPPublisher asr_publisher(
+    auto json_formatter = std::make_shared<JsonMessageFormatter>();
+    UDPPublisher json_publisher(
         "127.0.0.1",
-        5003,
-        resultQueue, 
+        5002,
+        jsonResultQueue,
         running,
-        asr_formatter,
+        json_formatter,
         1000);
-
-    ASRThread asrThread(resultQueue,
-		        running,
-		       	asr_trigger,
-			gaze_mutex,
-                        gaze_cv,
-                        trigger_asr,
-			asr_busy);
+    auto bsvar_formatter = std::make_shared<BSVariableMessageFormatter>();
+    UDPPublisher bsvar_publisher(
+        "127.0.0.1",
+        5000,
+        bsvarResultQueue,
+        running,
+        bsvar_formatter,
+        10);
+    ASRThread asrThread(jsonResultQueue,
+	bsvarResultQueue,
+	running,
+	asr_trigger,
+	gaze_mutex,
+	gaze_cv,
+	trigger_asr,
+	asr_busy);
 
     std::thread inferenceThread(std::ref(mlThread));
-    std::thread asr_publisherThread(std::ref(asr_publisher));
     std::thread asr_thread_handle(std::ref(asrThread));
+    std::thread json_publisherThread(std::ref(json_publisher));
+    std::thread bsvar_publisherThread(std::ref(bsvar_publisher));
 
     while (running) {
         std::this_thread::sleep_for(std::chrono::seconds(1));
@@ -94,10 +106,13 @@ int main(int argc, char **argv) {
 
     // Cleanup and shutdown
     running = false;
-    resultQueue.signalShutdown();
+    jsonResultQueue.signalShutdown();
+    bsvarResultQueue.signalShutdown();
 
     inferenceThread.join();
-    asr_publisherThread.join();
+    //asr_publisherThread.join();
+    json_publisherThread.join();
+    bsvar_publisherThread.join();
 
     return 0;
 }
