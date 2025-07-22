@@ -350,6 +350,18 @@ void ASRThread::operator()() {
     while (running) {
 	    std::unique_lock<std::mutex> lock(gaze_mutex);
             gaze_cv.wait(lock, [&]{ return trigger_asr; });
+	    //Gaze detected send "Listening..." prompt
+            InferenceResult listening;
+            listening.num_faces_attending = 1;
+            listening.count_all_faces_in_frame = 1;
+            listening. timestamp = std::chrono::system_clock::now();
+            listening.asr = "Listening...";
+            InferenceResult bsresult(listening);
+            InferenceResult jsresult(listening);
+            jsonResultQueue.push(std::move(jsresult));
+            bsvarResultQueue.push(std::move(bsresult));
+            std::cout<<"NSR:ASR Thread:sent Listening..."<<std::endl;
+
             InferenceResult result = runASR();
 	    if(result.asr.empty())
             {
@@ -361,9 +373,10 @@ void ASRThread::operator()() {
 		result.num_faces_attending = 1;
 		result.count_all_faces_in_frame = 1;
 		result. timestamp = std::chrono::system_clock::now();
-		InferenceResult bsresult(result);
-                jsonResultQueue.push(std::move(result));
-                bsvarResultQueue.push(std::move(bsresult));
+                InferenceResult jsresult_asr(result);
+                InferenceResult bsresult_asr(result);
+                jsonResultQueue.push(std::move(jsresult_asr));
+                bsvarResultQueue.push(std::move(bsresult_asr));
             }
             trigger_asr = false;
 	    asr_busy = false;

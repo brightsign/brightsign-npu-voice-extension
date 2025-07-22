@@ -330,14 +330,25 @@ cp examples/whisper/model/vocab_en.txt ../../install/RK3588/model/
 cd "${project_root:-.}"/toolkit/rknn_model_zoo/
 
 mkdir -p examples/RetinaFace/model/RK3568
+pushd examples/RetinaFace/model
+chmod +x ./download_model.sh && ./download_model.sh
+popd
+mkdir -p examples/whisper/model/RK3568
+pushd examples/whisper/model
+chmod +x ./download_model.sh && ./download_model.sh
+popd
+
+cd "${project_root:-.}"/toolkit/rknn_model_zoo/
+
+mkdir -p examples/RetinaFace/model/RK3568
 
 docker run -it --rm -v $(pwd):/zoo rknn_tk2 /bin/bash \
     -c "cd /zoo/examples/RetinaFace/python && python convert.py ../model/RetinaFace_mobile320.onnx rk3568 i8 ../model/RK3568/RetinaFace.rknn"
 docker run -it --rm -v $(pwd):/zoo rknn_tk2 /bin/bash \
-    -c "cd /zoo/examples/whisper/python && python convert.py ../model/whisper_decoder_base_20s.onnx rk3568 fp ../model/RK3588/whisper_decoder_base_20s.rknn"
+    -c "cd /zoo/examples/whisper/python && python convert.py ../model/whisper_decoder_base_20s.onnx rk3568 fp ../model/RK3568/whisper_decoder_base_20s.rknn"
 
 docker run -it --rm -v $(pwd):/zoo rknn_tk2 /bin/bash \
-    -c "cd /zoo/examples/whisper/python && python convert.py ../model/whisper_encoder_base_20s.onnx rk3568 fp ../model/RK3588/whisper_encoder_base_20s.rknn"
+    -c "cd /zoo/examples/whisper/python && python convert.py ../model/whisper_encoder_base_20s.onnx rk3568 fp ../model/RK3568/whisper_encoder_base_20s.rknn"
 
 # move the generated model to the right place
 mkdir -p ../../install/RK3568/model
