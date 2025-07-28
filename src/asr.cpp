@@ -16,10 +16,10 @@ ASRThread::ASRThread(
     std::condition_variable& gaze_cv_,
     bool& trigger_asr_,
     std::atomic<bool>& asr_busy_,
+    std::string& alsa_device_,
     int sample_rate,
     int channels,
-    int record_seconds,
-    std::string alsa_device_)
+    int record_seconds)
     : jsonResultQueue(jsonQueue),
       bsvarResultQueue(bsvarQueue),
       running(isRunning),
@@ -28,10 +28,10 @@ ASRThread::ASRThread(
       gaze_cv(gaze_cv_),
       trigger_asr(trigger_asr_),
       asr_busy(asr_busy_),
+      alsa_device(alsa_device_),
       sample_rate(sample_rate),
       channels(channels),
-      record_seconds(record_seconds),
-      alsa_device(alsa_device_)
+      record_seconds(record_seconds)
 {
     vocab_path = "model/vocab_en.txt";
     task_code = TASK_CODE;
@@ -360,7 +360,6 @@ void ASRThread::operator()() {
             InferenceResult jsresult(listening);
             jsonResultQueue.push(std::move(jsresult));
             bsvarResultQueue.push(std::move(bsresult));
-            std::cout<<"NSR:ASR Thread:sent Listening..."<<std::endl;
 
             InferenceResult result = runASR();
 	    if(result.asr.empty())

@@ -340,8 +340,6 @@ popd
 
 cd "${project_root:-.}"/toolkit/rknn_model_zoo/
 
-mkdir -p examples/RetinaFace/model/RK3568
-
 docker run -it --rm -v $(pwd):/zoo rknn_tk2 /bin/bash \
     -c "cd /zoo/examples/RetinaFace/python && python convert.py ../model/RetinaFace_mobile320.onnx rk3568 i8 ../model/RK3568/RetinaFace.rknn"
 docker run -it --rm -v $(pwd):/zoo rknn_tk2 /bin/bash \

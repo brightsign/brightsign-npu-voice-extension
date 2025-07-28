@@ -93,7 +93,8 @@ int main(int argc, char **argv) {
 	gaze_mutex,
 	gaze_cv,
 	trigger_asr,
-	asr_busy);
+	asr_busy,
+	audio_device);
 
     std::thread inferenceThread(std::ref(mlThread));
     std::thread asr_thread_handle(std::ref(asrThread));

@@ -52,10 +52,10 @@ public:
         std::condition_variable& gaze_cv,
         bool& trigger_asr,
 	std::atomic<bool>& asr_busy,
+	std::string &alsa_device,
         int sample_rate = 16000,
         int channels = 1,
-        int record_seconds = 3,
-	std::string alsa_device = "plughw:3,0");
+        int record_seconds = 3);
     ~ASRThread(); // Destructor
     void operator()();
 };
