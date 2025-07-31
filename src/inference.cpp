@@ -70,14 +70,16 @@ InferenceResult MLInferenceThread::runInference(cv::Mat& cap) {
 }
 
 MLInferenceThread::MLInferenceThread(
-        const char* model_path,
-        const char* source_name,
+        const std::string& model_path,
+        const std::string& source_name,
         ThreadSafeQueue<InferenceResult>& jsonQueue,
         ThreadSafeQueue<InferenceResult>& bsvarQueue,
         std::mutex& gaze_mutex_,
         std::condition_variable& gaze_cv_,
         bool& trigger_asr_,
         std::atomic<bool>& asr_busy_,
+        std::atomic<int>& current_faces_attending_,
+        std::atomic<int>& current_total_faces_,
         std::atomic<bool>& isRunning,
         int target_fps=5)
     : jsonResultQueue(jsonQueue),
@@ -86,17 +88,21 @@ MLInferenceThread::MLInferenceThread(
       gaze_cv(gaze_cv_),
       trigger_asr(trigger_asr_),
       asr_busy(asr_busy_),
+      current_faces_attending(current_faces_attending_),
+      current_total_faces(current_total_faces_),
       running(isRunning),
       target_fps(target_fps) {
-
 
     // Create and initialize the model
     // rknn_app_context_t rknn_app_ctx;
     memset(&rknn_app_ctx, 0, sizeof(rknn_app_ctx));
-    auto ret = init_retinaface_model(model_path, &rknn_app_ctx);
-       if (ret != 0) {
+    std::string retinaface_model = model_path + "/RetinaFace.rknn";
+    std::cout<< "RetinaFace model path: " << retinaface_model << std::endl;
+    
+    auto ret = init_retinaface_model(retinaface_model, &rknn_app_ctx);
+    if (ret != 0) {
         printf("init_retinaface_model fail! ret=%d model_path=%s\n", ret, model_path);
-        // return -1;
+        return;
     }
 
     // open the capture
@@ -185,7 +191,9 @@ void MLInferenceThread::operator()() {
 	{
 	    std::unique_lock<std::mutex> lock(gaze_mutex);
             trigger_asr = true;
-	    asr_busy = true;
+            asr_busy = true;
+            current_faces_attending = result.num_faces_attending;
+            current_total_faces = result.count_all_faces_in_frame;  
             gaze_cv.notify_one();
 	}
         // release opencv image

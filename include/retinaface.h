@@ -3,6 +3,7 @@
 
 #include "rknn_api.h"
 #include "common.h"
+#include <string>
 
 typedef struct {
     rknn_context rknn_ctx;
@@ -38,7 +39,7 @@ typedef struct {
     retinaface_object_t object[128];
 } retinaface_result;
 
-int init_retinaface_model(const char *model_path, rknn_app_context_t *app_ctx);
+int init_retinaface_model(const std::string& model_path, rknn_app_context_t *app_ctx);
 
 int release_retinaface_model(rknn_app_context_t *app_ctx);
 

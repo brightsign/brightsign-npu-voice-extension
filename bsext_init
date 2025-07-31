@@ -90,7 +90,7 @@ run_attention_demo() {
     SOC_HOME=${SCRIPT_PATH}/${SOC_NAME}
     cd ${SOC_HOME}
 
-    CMD_ARGS="${SOC_HOME}/model/RetinaFace.rknn $(get_video_device) $(get_usb_audio_device)"
+    CMD_ARGS="${SOC_HOME}/model/ $(get_video_device) $(get_usb_audio_device)"
     echo "Using Model and Device: ${CMD_ARGS}"
     
     # Default to running in foreground

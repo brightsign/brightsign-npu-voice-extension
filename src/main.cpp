@@ -34,6 +34,8 @@ std::mutex gaze_mutex;
 std::condition_variable gaze_cv;
 bool trigger_asr = false;
 std::atomic<bool> asr_busy{false};
+std::atomic<int> current_faces_attending{0};
+std::atomic<int> current_total_faces{0};
 
 void signalHandler(int signum) {
     std::cout << "Interrupt signal (" << signum << ") received.\n";
@@ -45,21 +47,19 @@ void signalHandler(int signum) {
 }
 
 int main(int argc, char **argv) {
-    char *model_name = NULL;
     freopen("/storage/sd/console.log", "a", stdout);
     if (argc != 4) {
-        printf("Usage: %s <rknn model> <source> \n", argv[0]);
+        printf("Usage: %s <rknn model> <source> <audio device>\n", argv[0]);
         return -1;
     }
-
     // The path where the model is located
-    model_name = (char *)argv[1];
-    char *source_name = argv[2];
+    std::string model_path = argv[1];
+    std::string source_name = argv[2];
     //USB Mic device
     std::string audio_device = "plug" + std::string(argv[3]);
-
+    
     MLInferenceThread mlThread(
-	model_name,
+	model_path,
 	source_name,
 	jsonResultQueue,
 	bsvarResultQueue,
@@ -67,6 +67,8 @@ int main(int argc, char **argv) {
 	gaze_cv,
 	trigger_asr,
 	asr_busy,
+    current_faces_attending,
+    current_total_faces,
 	running,
 	30);
 
@@ -86,15 +88,19 @@ int main(int argc, char **argv) {
         running,
         bsvar_formatter,
         10);
-    ASRThread asrThread(jsonResultQueue,
-	bsvarResultQueue,
-	running,
-	asr_trigger,
-	gaze_mutex,
-	gaze_cv,
-	trigger_asr,
-	asr_busy,
-	audio_device);
+    ASRThread asrThread(
+        model_path,
+        jsonResultQueue,
+	    bsvarResultQueue,
+	    running,
+	    asr_trigger,
+	    gaze_mutex,
+	    gaze_cv,
+	    trigger_asr,
+	    asr_busy,
+        current_faces_attending,
+        current_total_faces,
+	    audio_device);
 
     std::thread inferenceThread(std::ref(mlThread));
     std::thread asr_thread_handle(std::ref(asrThread));
@@ -111,7 +117,6 @@ int main(int argc, char **argv) {
     bsvarResultQueue.signalShutdown();
 
     inferenceThread.join();
-    //asr_publisherThread.join();
     json_publisherThread.join();
     bsvar_publisherThread.join();
 

@@ -9,6 +9,7 @@
 #include "image_utils.h"
 #include "rknn_box_priors.h"
 
+
 #define NMS_THRESHOLD 0.4
 #define CONF_THRESHOLD 0.5
 #define VIS_THRESHOLD 0.4
@@ -202,21 +203,19 @@ static int post_process_retinaface(rknn_app_context_t *app_ctx, image_buffer_t *
     return 0;
 }
 
-int init_retinaface_model(const char *model_path, rknn_app_context_t *app_ctx) {
+int init_retinaface_model(const std::string& model_path, rknn_app_context_t *app_ctx) {
     int ret;
     int model_len = 0;
     char *model;
     rknn_context ctx = 0;
 
     // Load RKNN Model
-    printf("Loading model from %s\n", model_path);
-    model_len = read_data_from_file(model_path, &model);
+    model_len = read_data_from_file(model_path.c_str(), &model);
     if (model == NULL) {
         printf("load_model fail!\n");
         return -1;
     }
-    // printf("Load model done, size=%d\n", model_len);
-
+    
     ret = rknn_init(&ctx, model, model_len, 0, NULL);
     printf("rknn_init done, %d\n", ret);
     free(model);
