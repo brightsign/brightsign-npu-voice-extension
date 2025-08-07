@@ -90,7 +90,13 @@ run_attention_demo() {
     SOC_HOME=${SCRIPT_PATH}/${SOC_NAME}
     cd ${SOC_HOME}
 
-    CMD_ARGS="${SOC_HOME}/model/ $(get_video_device) $(get_usb_audio_device)"
+    CMD_ARGS="${SOC_HOME}/model/RetinaFace.rknn \
+              ${SOC_HOME}/model/whisper_encoder_base.rknn \
+              ${SOC_HOME}/model/whisper_decoder_base.rknn \
+              ${SOC_HOME}/model/mel_80_filters.txt \
+              ${SOC_HOME}/model/vocab_en.txt \
+              $(get_video_device) \
+              $(get_usb_audio_device)"
     echo "Using Model and Device: ${CMD_ARGS}"
     
     # Default to running in foreground

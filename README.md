@@ -5,39 +5,44 @@ This is an example BrightSign Model Package (BSMP) that implements Voice Detecti
 BSMP are delivered as an BrightSign OS (BOS) "extension." Extensions are delivered as firmware update files that are installed on a reboot. These are basically Linux squashfs file systems that extend the firmware to include the BSMP. You can learn more about extensions in our [Extension Template Repository](https://github.com/brightsign/extension-template).
 
 ## Supported Players
+
 | player | minimum OS Version required |
 | --- | --- |
-| XT-5: XT1145, XT2145, LS-5 on 9.0 | [9.0.189](https://brightsignbiz.s3.amazonaws.com/firmware/xd5/9.0/9.0.189/brightsign-xd5-update-9.0.189.zip) |
-| XT-5: XT1145, XT2145, LS-5 on 9.1 | [9.1.52](https://brightsignbiz.s3.amazonaws.com/firmware/xd5/9.1/9.1.52/brightsign-xd5-update-9.1.52.zip)    |
+| XT-5: XT1145, XT2145 on 9.0 | [9.0.189](https://brightsignbiz.s3.amazonaws.com/firmware/xd5/9.0/9.0.189/brightsign-xd5-update-9.0.189.zip) |
+| XT-5: XT1145, XT2145 on 9.1 | [9.1.52](https://brightsignbiz.s3.amazonaws.com/firmware/xd5/9.1/9.1.52/brightsign-xd5-update-9.1.52.zip)    |
 
 ## Supported Cameras
 
 In general, any camera supported by Linux *should* work.  We've had great luck with Logitech cameras, especially the C270.
 
 ## Using the Voice Recognition (ASR) Data
+
 The BrightSign NPU voice extension listens for voice activity when a user is gazing at the screen. When speech is detected, it uses an on-device Whisper-based ASR model to transcribe the audio. The resulting transcript is sent in a UDP packet to localhost for further processing or display.
 
-The packet is sent to port 5003 and is intended for use by HTML/JavaScript signage applications (or any other client that listens on UDP). Its format is JSON:
-
+The packet is sent to port 5002 and is intended for use by HTML/JavaScript signage applications (or any other client that listens on UDP). Its format is JSON:
 
 ```ini
-{"ASR":"show me some drinks"}
+{"ASR":"show me drinks"}
 ```
+
 The ASR field contains the recognized speech as plain text.
 
 Applications can use this text to trigger product lookups, play relevant videos, or update the UI as needed.
 
 BrightAuthor:connected can natively parse these packets without needing to provide any new code.  An example of how to use this is [here](https://github.com/brightsign/simple-voice-detection-html).
 
-
 ## Decorated Camera Output & Live ASR
+
 ### Face Detection:
+
 Each detected face has a bounding box drawn around it. Faces with two visible eyes (i.e., looking at the screen) are shown with a green box; other faces are shown with a red box.
 
 ### Image Output:
+
 The decorated images are continuously written to a file in the /tmp folder (a RAM disk, so it does not impact storage life). You can use these images to simulate the video feed with bounding boxes. Example: simple-gaze-detection-html.
 
 ### Live ASR (Automatic Speech Recognition):
+
 When a user is gazing at the screen and speaks, their voice is transcribed on-device using a Whisper-based ASR model. The live ASR result is sent via UDP and also displayed at the bottom of the screen in real time.
 
 This means both visual feedback (where people are looking) and live speech recognition together in the signage/demo experience!
@@ -60,23 +65,26 @@ For this exercise, the RetinaFace model fnd Whisper model from the [Rockchip Mod
 This project will create an installable BrightSign Extension that:
 
 1. Loads the compiled models into the RK3588 NPU
-2.Acquires images and audio from an attached Video for Linux (v4l) device such as a USB webcam
+2. Acquires images and audio from an attached Video for Linux (v4l) device such as a USB webcam
 
    - Captures video frames using OpenCV
    - Captures voice audio from the webcam’s built-in microphone using ALSA
-3. Runs the model for each captured image to detect faces in the image
-4. For each face found:
+
+2. Runs the model for each captured image to detect faces in the image
+3. For each face found:
 
    - determine if the face is looking at the screen
    - count the total number of faces
    - count the number of faces looking at the screen
    - decorate the captured image with a bounding box for the face
    - decorate the captured image with dots for the facial features
-5. Runs on-device Automatic Speech Recognition (ASR)
-    
+
+4. Runs on-device Automatic Speech Recognition (ASR)
+
    - When a user is detected gazing at the screen, the microphone is activated and their speech is transcribed in real time using a neural ASR model (Whisper).
-   - The resulting transcribed text is published via UDP to port :5003 in JSON format, and can be displayed live in the signage UI.
-6. Save the decorated image (overwriting any previous image) to `/tmp/output.jpg`
+   - The resulting transcribed text is published via UDP to port :5002 in JSON format, and can be displayed live in the signage UI.
+
+5. Save the decorated image (overwriting any previous image) to `/tmp/output.jpg`
 
 ### Extension Control
 
@@ -284,6 +292,8 @@ This Docker image needs only be built once and can be reused across models
 
 ```sh
 cd "${project_root:-.}"/toolkit/rknn-toolkit2/rknn-toolkit2/docker/docker_file/ubuntu_20_04_cp38
+echo 'RUN pip3 install openai-whisper==20231117 onnx onnxsim' >> Dockerfile_ubuntu_20_04_for_cp38
+echo 'RUN pip3 install ./rknn_toolkit_lite2/packages/rknn_toolkit_lite2-1.6.0-cp310-cp310-linux_aarch64.whl || echo "Optional RKNN Lite install skipped"' >> Dockerfile_ubuntu_20_04_for_cp38
 docker build --rm -t rknn_tk2 -f Dockerfile_ubuntu_20_04_for_cp38 .
 ```
 
@@ -297,9 +307,7 @@ pushd examples/RetinaFace/model
 chmod +x ./download_model.sh && ./download_model.sh
 popd
 mkdir -p examples/whisper/model/RK3588
-pushd examples/whisper/model
-chmod +x ./download_model.sh && ./download_model.sh
-popd
+
 ```
 
 Compile the model.  Note the opetion for various SoCs.
@@ -307,55 +315,20 @@ Compile the model.  Note the opetion for various SoCs.
 ```sh
 # for RK3588 -- XT-5 players
 cd "${project_root:-.}"/toolkit/rknn_model_zoo/
-
+docker run -it --rm -v $(pwd):/zoo rknn_tk2 /bin/bash -c "cd /zoo/examples/whisper/python && python export_onnx.py --model_type base --n_mels 80"
 docker run -it --rm -v $(pwd):/zoo rknn_tk2 /bin/bash \
     -c "cd /zoo/examples/RetinaFace/python && python convert.py ../model/RetinaFace_mobile320.onnx rk3588 i8 ../model/RK3588/RetinaFace.rknn"
 docker run -it --rm -v $(pwd):/zoo rknn_tk2 /bin/bash \
-    -c "cd /zoo/examples/whisper/python && python convert.py ../model/whisper_decoder_base_20s.onnx rk3588 fp ../model/RK3588/whisper_decoder_base_20s.rknn"
-
+    -c "cd /zoo/examples/whisper/python && python convert.py ../model/whisper_decoder_base.onnx rk3588 fp ../model/RK3588/whisper_decoder_base.rknn"
 docker run -it --rm -v $(pwd):/zoo rknn_tk2 /bin/bash \
-    -c "cd /zoo/examples/whisper/python && python convert.py ../model/whisper_encoder_base_20s.onnx rk3588 fp ../model/RK3588/whisper_encoder_base_20s.rknn"
+    -c "cd /zoo/examples/whisper/python && python convert.py ../model/whisper_encoder_base.onnx rk3588 fp ../model/RK3588/whisper_encoder_base.rknn"
 # move the generated model to the right place
 mkdir -p ../../install/RK3588/model
 cp examples/RetinaFace/model/RK3588/RetinaFace.rknn ../../install/RK3588/model/
-cp examples/whisper/model/RK3588/whisper_encoder_base_20s.rknn ../../install/RK3588/model/
-cp examples/whisper/model/RK3588/whisper_decoder_base_20s.rknn ../../install/RK3588/model/
+cp examples/whisper/model/RK3588/whisper_encoder_base.rknn ../../install/RK3588/model/
+cp examples/whisper/model/RK3588/whisper_decoder_base.rknn ../../install/RK3588/model/
 cp examples/whisper/model/mel_80_filters.txt ../../install/RK3588/model/
 cp examples/whisper/model/vocab_en.txt ../../install/RK3588/model/
-```
-
-```sh
-# For RK3568 -- LS-5 Players
-
-cd "${project_root:-.}"/toolkit/rknn_model_zoo/
-
-mkdir -p examples/RetinaFace/model/RK3568
-pushd examples/RetinaFace/model
-chmod +x ./download_model.sh && ./download_model.sh
-popd
-mkdir -p examples/whisper/model/RK3568
-pushd examples/whisper/model
-chmod +x ./download_model.sh && ./download_model.sh
-popd
-
-cd "${project_root:-.}"/toolkit/rknn_model_zoo/
-
-docker run -it --rm -v $(pwd):/zoo rknn_tk2 /bin/bash \
-    -c "cd /zoo/examples/RetinaFace/python && python convert.py ../model/RetinaFace_mobile320.onnx rk3568 i8 ../model/RK3568/RetinaFace.rknn"
-docker run -it --rm -v $(pwd):/zoo rknn_tk2 /bin/bash \
-    -c "cd /zoo/examples/whisper/python && python convert.py ../model/whisper_decoder_base_20s.onnx rk3568 fp ../model/RK3568/whisper_decoder_base_20s.rknn"
-
-docker run -it --rm -v $(pwd):/zoo rknn_tk2 /bin/bash \
-    -c "cd /zoo/examples/whisper/python && python convert.py ../model/whisper_encoder_base_20s.onnx rk3568 fp ../model/RK3568/whisper_encoder_base_20s.rknn"
-
-# move the generated model to the right place
-mkdir -p ../../install/RK3568/model
-cp examples/RetinaFace/model/RK3568/RetinaFace.rknn ../../install/RK3568/model/
-cp examples/whisper/model/RK3568/whisper_encoder_base_20s.rknn ../../install/RK3568/model/
-cp examples/whisper/model/RK3568/whisper_decoder_base_20s.rknn ../../install/RK3568/model/
-cp examples/whisper/model/mel_80_filters.txt ../../install/RK3568/model/
-cp examples/whisper/model/vocab_en.txt ../../install/RK3568/model/
-
 ```
 
 **The necessary binaries (model, libraries) are now in the `install` directory of the project**

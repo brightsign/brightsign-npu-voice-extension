@@ -70,7 +70,7 @@ InferenceResult MLInferenceThread::runInference(cv::Mat& cap) {
 }
 
 MLInferenceThread::MLInferenceThread(
-        const std::string& model_path,
+        const std::string& retinaface_model_path,
         const std::string& source_name,
         ThreadSafeQueue<InferenceResult>& jsonQueue,
         ThreadSafeQueue<InferenceResult>& bsvarQueue,
@@ -96,12 +96,11 @@ MLInferenceThread::MLInferenceThread(
     // Create and initialize the model
     // rknn_app_context_t rknn_app_ctx;
     memset(&rknn_app_ctx, 0, sizeof(rknn_app_ctx));
-    std::string retinaface_model = model_path + "/RetinaFace.rknn";
-    std::cout<< "RetinaFace model path: " << retinaface_model << std::endl;
+    std::cout<< "RetinaFace model path: " << retinaface_model_path << std::endl;
     
-    auto ret = init_retinaface_model(retinaface_model, &rknn_app_ctx);
+    auto ret = init_retinaface_model(retinaface_model_path, &rknn_app_ctx);
     if (ret != 0) {
-        printf("init_retinaface_model fail! ret=%d model_path=%s\n", ret, model_path);
+        printf("init_retinaface_model fail! ret=%d model_path=%s\n", ret, retinaface_model_path);
         return;
     }
 

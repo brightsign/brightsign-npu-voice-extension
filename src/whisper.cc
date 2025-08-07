@@ -187,133 +187,6 @@ out:
     return ret;
 }
 
-#if 0
-int inference_decoder_model(rknn_voice_app_context_t *app_ctx, float *encoder_output, VocabEntry *vocab, int task_code, std::vector<std::string> &recognized_text)
-{
-    int ret;
-    rknn_input inputs[2];
-    rknn_output outputs[1];
-
-    memset(inputs, 0, sizeof(inputs));
-    memset(outputs, 0, sizeof(outputs));
-    // Set Input Data
-    inputs[0].index = 0;
-    inputs[0].type = RKNN_TENSOR_INT64;
-    inputs[0].size = MAX_TOKENS * sizeof(int64_t);
-    inputs[0].buf = (int64_t *)malloc(inputs[0].size);
-
-    inputs[1].index = 1;
-    inputs[1].type = RKNN_TENSOR_FLOAT32;
-    inputs[1].size = DECODER_INPUT_SIZE * sizeof(float);
-    inputs[1].buf = (float *)malloc(inputs[1].size);
-    memcpy(inputs[1].buf, encoder_output, inputs[1].size);
-
-    int64_t tokens[MAX_TOKENS + 1] = {50258, task_code, 50359, 50363}; // tokenizer.sot_sequence_including_notimestamps
-    int timestamp_begin = 50364;                                       // tokenizer.timestamp_begin
-    int next_token = 50258;                                            // tokenizer.sot
-    int end_token = 50257;                                             // tokenizer.eot
-    int pop_id = MAX_TOKENS;
-    int vocab_size = 50257;
-
-    int count = 0; // Avoid getting stuck in a decode loop
-    std::string all_token_str = "";
-
-    std::cout<<"inference_decoder_model:MAX_TOKENS: "<<MAX_TOKENS<<std::endl;
-    for (int i = 0; i < MAX_TOKENS / 4; i++)
-    {
-        memcpy(&tokens[i * 4], tokens, 4 * sizeof(int64_t));
-    }
-
-    while (next_token != end_token && count < 1000)
-    {
-        count++;
-
-        memcpy(inputs[0].buf, tokens, inputs[0].size);
-
-        ret = rknn_inputs_set(app_ctx->rknn_ctx, 2, inputs);
-        if (ret < 0)
-        {
-            printf("rknn_input_set fail! ret=%d\n", ret);
-            goto out;
-        }
-
-        // Run
-        ret = rknn_run(app_ctx->rknn_ctx, nullptr);
-        if (ret < 0)
-        {
-            printf("rknn_run fail! ret=%d\n", ret);
-            goto out;
-        }
-
-        // Get Output
-        outputs[0].want_float = 1;
-        ret = rknn_outputs_get(app_ctx->rknn_ctx, 1, outputs, NULL);
-        if (ret < 0)
-        {
-            printf("rknn_outputs_get fail! ret=%d\n", ret);
-            goto out;
-        }
-        //next_token = argmax((float *)outputs[0].buf, vocab_size);
-	int total_floats = outputs[0].size / sizeof(float);
-        std::cout<<"NSR:total_floats: "<<total_floats<<std::endl; 
-        next_token = argmax((float *)outputs[0].buf, total_floats);
-        std::cout<<"NSR:next_token: "<<next_token<<std::endl; 
-	if (next_token < 0 || next_token >= VOCAB_NUM) {
-           std::cout << "ERROR: next_token out of range or error: " << next_token << std::endl;
-           // handle error or skip this output
-        }
-	else
-        {
-        std::string next_token_str = vocab[next_token].token;
-        all_token_str += next_token_str;
-
-        if (next_token > timestamp_begin)
-        {
-            continue;
-        }
-        if (pop_id > 4)
-        {
-            pop_id--;
-        }
-
-        tokens[MAX_TOKENS] = next_token;
-
-        for (int j = pop_id; j < MAX_TOKENS; j++)
-        {
-            tokens[j] = tokens[j + 1];
-        }
-
-        // Remeber to release rknn output
-        rknn_outputs_release(app_ctx->rknn_ctx, 1, outputs);
-	}
-    }
-
-    replace_substr(all_token_str, "\u0120", " ");
-    replace_substr(all_token_str, "<|endoftext|>", "");
-    replace_substr(all_token_str, "\n", "");
-
-    if (all_token_str.size())
-    {
-        if (task_code == 50260) // TASK_FOR_ZH
-        {
-            all_token_str = base64_decode(all_token_str);
-        }
-
-        recognized_text.push_back(all_token_str);
-    }
-
-out:
-    for (int i = 0; i < 2; i++)
-    {
-        if (inputs[i].buf != NULL)
-        {
-            free(inputs[i].buf);
-        }
-    }
-
-    return ret;
-}
-#endif
 // Utility to check for repeated n-grams at the end of the sequence
 bool has_repeated_ngram(const std::vector<int>& tokens, int ngram_len, int min_repeats = 2) {
     int total = tokens.size();
@@ -417,12 +290,12 @@ int inference_decoder_model(
 
         // Token repeat window
         recent_tokens.push_back(next_token);
-	const int NGRAM_LEN = 6; // Try 4–8 tokens; tune as needed
-	const int NGRAM_REPEAT_MIN = 3; // How many times must it repeat?
-	if (has_repeated_ngram(recent_tokens, NGRAM_LEN, NGRAM_REPEAT_MIN)) {
-    		std::cout << "Detected repeated n-gram in output. Breaking out.\n";
-    		break;
-	}
+        const int NGRAM_LEN = 6; // Try 4–8 tokens; tune as needed
+        const int NGRAM_REPEAT_MIN = 3; // How many times must it repeat?
+        if (has_repeated_ngram(recent_tokens, NGRAM_LEN, NGRAM_REPEAT_MIN)) {
+                std::cout << "Detected repeated n-gram in output. Breaking out.\n";
+                break;
+        }
         if ((int)recent_tokens.size() > REPEAT_WINDOW)
             recent_tokens.erase(recent_tokens.begin());
 
@@ -470,29 +343,28 @@ int inference_decoder_model(
 int inference_whisper_model(rknn_whisper_context_t *app_ctx, std::vector<float> audio_data, float *mel_filters, VocabEntry *vocab, int task_code, std::vector<std::string> &recognized_text)
 {
     int ret;
-     TIMER timer;
+    TIMER timer;
     float *encoder_output = (float *)malloc(ENCODER_OUTPUT_SIZE * sizeof(float));
     recognized_text.clear();
-     timer.tik();
+    timer.tik();
     ret = inference_encoder_model(&app_ctx->encoder_context, audio_data, mel_filters, encoder_output);
     if (ret != 0)
     {
         printf("inference_encoder_model fail! ret=%d\n", ret);
         goto out;
     }
-     timer.tok();
-     timer.print_time("inference_encoder_model");
+    timer.tok();
+    timer.print_time("inference_encoder_model");
 
-     timer.tik();
-    std::cout<<"inference_decoder_model"<<std::endl;
+    timer.tik();
     ret = inference_decoder_model(&app_ctx->decoder_context, encoder_output, vocab, task_code, recognized_text);
     if (ret != 0)
     {
         printf("inference_decoder_model fail! ret=%d\n", ret);
         goto out;
     }
-     timer.tok();
-     timer.print_time("inference_decoder_model");
+    timer.tok();
+    timer.print_time("inference_decoder_model");
 
 out:
     if (encoder_output != NULL)

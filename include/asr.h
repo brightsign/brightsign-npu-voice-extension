@@ -71,7 +71,10 @@ public:
      * - Initializes mel filters
      */
     ASRThread(
-        const std::string& model_path,
+        const std::string& whisper_encoder_model,
+        const std::string& whisper_decoder_model,
+        const std::string& mel_filters_path,
+        const std::string& vocabulary_path,
         ThreadSafeQueue<InferenceResult>& jsonQueue,
         ThreadSafeQueue<InferenceResult>& bsvarQueue,
         std::atomic<bool>& isRunning,

@@ -40,13 +40,11 @@ int read_mel_filters(const char *fileName, float *data, int max_lines)
         perror("Error opening file");
         return -1;
     }
-    printf("NSR:read the lines: max lines:%d\n", max_lines);
     while (line_count < max_lines && fscanf(file, "%f", &data[line_count]) == 1)
     {
         line_count++;
     }
 
-    printf("NSR:read the lines: total line count:%d\n", line_count);
     fclose(file);
 
     return 0;
@@ -313,12 +311,10 @@ void audio_preprocess(audio_buffer_t *audio, float *mel_filters, std::vector<flo
 {
     int ret;
     int audio_length = audio->num_frames;
-    printf("NSR:audio len#:%d, MAX LEN:%d\n", audio_length, MAX_AUDIO_LENGTH);
     std::vector<float> ori_audio_data(audio->data, audio->data + audio_length);
 
     if (audio_length >= MAX_AUDIO_LENGTH)
     {
-	printf("NSR:audio length is greater than max len\n");
         std::vector<float> trim_audio_data(MAX_AUDIO_LENGTH);
         std::copy(ori_audio_data.begin(), ori_audio_data.begin() + MAX_AUDIO_LENGTH, trim_audio_data.begin());
         int cur_num_frames_of_stfts = MAX_AUDIO_LENGTH / HOP_LENGTH + 1;
@@ -326,14 +322,12 @@ void audio_preprocess(audio_buffer_t *audio, float *mel_filters, std::vector<flo
     }
     else
     {
-	printf("NSR:audio length is lesser than max len\n");
         int cur_num_frames_of_stfts = audio_length / HOP_LENGTH + 1;
         int x_mel_rows = N_MELS;
         int x_mel_cols = cur_num_frames_of_stfts - 1;
         int x_mel_cols_pad = MAX_AUDIO_LENGTH / HOP_LENGTH;
         std::vector<float> cur_x_mel(x_mel_rows * x_mel_cols, 0.0f);
         log_mel_spectrogram(ori_audio_data.data(), audio_length, cur_num_frames_of_stfts, mel_filters, cur_x_mel);
-	printf("NSR:audio_preprocess:pad_x_mel\n");
         pad_x_mel(cur_x_mel, x_mel_rows, x_mel_cols, x_mel, x_mel_cols_pad);
     }
 }
@@ -375,32 +369,6 @@ void replace_substr(std::string &str, const std::string &from, const std::string
     }
 }
 
-#if 0
-int argmax(float *array, int total_floats)
-{
-    int start_index = (MAX_TOKENS - 1) * 1 * VOCAB_NUM;
-    int max_index = 0;
-    float max_value = array[start_index];
-    std::cout<<"NSR:vocab: "<<VOCAB_NUM<<"start index:"<<start_index<<"max_value: "<<max_value<<"max tokens: "<<MAX_TOKENS<<std::endl;
-    for (int i = start_index + 1; i < start_index + VOCAB_NUM; i++)
-    {
-	if (std::isnan(array[i])) printf("NaN at %d\n", i);
-        if (std::isinf(array[i])) printf("Inf at %d\n", i);
-        if (array[i] != 0.0f) printf("Value at %d: %f\n", i, array[i]);
-        if (array[i] > max_value)
-        {
-            max_value = array[i];
-            max_index = i;
-	    std::cout<<"max_val: "<<max_value<<"max_index: "<<max_index<<std::endl;
-        }
-    }
-    int relative_index = max_index - start_index;
-    std::cout<<"NSR:argmax:relative::" <<relative_index<<"max_index: "<< max_index<<std::endl;
-    return relative_index;
-}
-#endif
-
-#if 1
 int argmax(float *array, int total_floats) {
     // Defensive: calculate the last valid full row
     int n_rows = total_floats / VOCAB_NUM;
@@ -417,7 +385,7 @@ int argmax(float *array, int total_floats) {
     }
 
     // For logging/debugging
-    //std::cout << "NSR:argmax: total_floats: " << total_floats
+    //std::cout << "argmax: total_floats: " << total_floats
     //          << ", n_rows: " << n_rows
     //          << ", start_index: " << start_index
     //          << ", VOCAB_NUM: " << VOCAB_NUM << std::endl;
@@ -427,17 +395,13 @@ int argmax(float *array, int total_floats) {
     bool all_nan = std::isnan(max_value);
     for (int i = start_index + 1; i < start_index + VOCAB_NUM; i++) {
         if (std::isnan(array[i])) {
-            std::cout << "NSR:argmax: NaN at " << i << std::endl;
             continue;
         }
         all_nan = false;
-        //if (std::isinf(array[i])) std::cout << "NSR:argmax: Inf at " << i << std::endl;
-        //if (array[i] != 0.0f) std::cout << "NSR:argmax: Value at " << i << ": " << array[i] << std::endl;
-
         if (array[i] > max_value) {
             max_value = array[i];
             max_index = i;
-            //std::cout << "NSR:argmax: max_val: " << max_value << ", max_index: " << max_index << std::endl;
+            //std::cout << "argmax: max_val: " << max_value << ", max_index: " << max_index << std::endl;
         }
     }
 
@@ -447,7 +411,7 @@ int argmax(float *array, int total_floats) {
     }
 
     int relative_index = max_index - start_index;
-    //std::cout << "NSR:argmax: relative_index: " << relative_index << ", max_index: " << max_index << std::endl;
+    //std::cout << "argmax: relative_index: " << relative_index << ", max_index: " << max_index << std::endl;
 
     // Final defensive check
     if (relative_index < 0 || relative_index >= VOCAB_NUM) {
@@ -458,7 +422,6 @@ int argmax(float *array, int total_floats) {
     return relative_index;
 }
 
-#endif
 static int32_t get_char_index(char c)
 {
     if (c >= 'A' && c <= 'Z')

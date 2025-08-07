@@ -8,7 +8,10 @@
 #include <iomanip>
 
 ASRThread::ASRThread(
-    const std::string& model_path,
+    const std::string& whisper_encoder_model,
+    const std::string& whisper_decoder_model,
+    const std::string& mel_filters_path,
+    const std::string& vocabulary_path,
     ThreadSafeQueue<InferenceResult>& jsonQueue,
     ThreadSafeQueue<InferenceResult>& bsvarQueue,
     std::atomic<bool>& isRunning,
@@ -37,36 +40,38 @@ ASRThread::ASRThread(
       sample_rate(sample_rate),
       channels(channels),
       record_seconds(record_seconds),
-      vocab_path{model_path + "/vocab_en.txt"},
       task_code{TASK_CODE},
       mel_filters(N_MELS * MELS_FILTERS_SIZE),
       rknn_app_ctx{},
       vocab{}
 {
-    std::string encoder_model = model_path + "/whisper_encoder_base_20s.rknn";
-    std::string decoder_model = model_path + "/whisper_decoder_base_20s.rknn";
     asr_trigger = true;
+    std::cout << "ASRThread initialized with individual model files:" << std::endl;
+    std::cout << "Whisper Encoder: " << whisper_encoder_model << std::endl;
+    std::cout << "Whisper Decoder: " << whisper_decoder_model << std::endl;
+    std::cout << "Mel Filters: " << mel_filters_path << std::endl;
+    std::cout << "Vocabulary: " << vocabulary_path << std::endl;
     //Init whisper encode and decoder models.
-    int ret = init_whisper_model(encoder_model.c_str(), &rknn_app_ctx.encoder_context);
+    int ret = init_whisper_model(whisper_encoder_model.c_str(), &rknn_app_ctx.encoder_context);
     if (ret != 0)
     {
         std::cout << "init_whisper_model fail! ret=" << ret << std::endl;
     }
-    ret = init_whisper_model(decoder_model.c_str(), &rknn_app_ctx.decoder_context);
+    ret = init_whisper_model(whisper_decoder_model.c_str(), &rknn_app_ctx.decoder_context);
     if (ret != 0)
     {
         std::cout << "init_whisper_model fail! ret=" << ret << std::endl;
     }
-    ret = read_mel_filters(MEL_FILTERS_PATH, mel_filters.data(), mel_filters.size());
+    ret = read_mel_filters(mel_filters_path.c_str(), mel_filters.data(), mel_filters.size());
     if (ret != 0)
     {
-        std::cout << "read mel_filters fail! ret=" << ret << " mel_filters_path=" << MEL_FILTERS_PATH << std::endl;
+        std::cout << "read mel_filters fail! ret=" << ret << " mel_filters_path=" << mel_filters_path << std::endl;
     }
 
-    ret = read_vocab(vocab_path.c_str(), vocab);
+    ret = read_vocab(vocabulary_path.c_str(), vocab);
     if (ret != 0)
     {
-        std::cout << "read vocab fail! ret=" << ret << " vocab_path=" << vocab_path << std::endl;
+        std::cout << "read vocab fail! ret=" << ret << " vocabulary_path=" << vocabulary_path << std::endl;
     }
 }
 
@@ -181,7 +186,7 @@ bool record_on_vad(const std::string& device, const std::string& wav_path) {
         if (vad_result == 1) {
             consecutive_speech_frames++;
             if (!in_speech){
-                std::cout << "Speech detected, starting recording.\n";
+                //std::cout << "Speech detected, starting recording.\n";
                 in_speech = true;
                 has_real_speech = true;
             }
@@ -190,7 +195,7 @@ bool record_on_vad(const std::string& device, const std::string& wav_path) {
             silence_frames = 0;
             if (consecutive_speech_frames >= MIN_SPEECH_FRAMES) {
                 has_real_speech = true;
-                std::cout << "Substantial speech detected (" << consecutive_speech_frames * 20 << "ms continuous)\n";
+                //std::cout << "Substantial speech detected (" << consecutive_speech_frames * 20 << "ms continuous)\n";
             }
        } else {
             consecutive_speech_frames = 0;
@@ -200,7 +205,7 @@ bool record_on_vad(const std::string& device, const std::string& wav_path) {
                     recorded_samples.insert(recorded_samples.end(), frame.begin(), frame.end());
                     speech_frames++;
                 } else {
-                    std::cout << "Silence after speech, stopping.\n";
+                    //std::cout << "Silence after speech, stopping.\n";
                     break;
                 }
             }
@@ -223,8 +228,8 @@ bool record_on_vad(const std::string& device, const std::string& wav_path) {
         return false;
     }
    
-    std::cout << "Recording complete: " << recorded_samples.size() / SAMPLE_RATE << " seconds, " 
-              << speech_frames << " speech frames\n";
+    //std::cout << "Recording complete: " << recorded_samples.size() / SAMPLE_RATE << " seconds, " 
+    //          << speech_frames << " speech frames\n";
 
     SF_INFO sfinfo{
         .frames = 0,

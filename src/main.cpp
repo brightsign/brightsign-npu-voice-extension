@@ -47,19 +47,31 @@ void signalHandler(int signum) {
 }
 
 int main(int argc, char **argv) {
-    freopen("/storage/sd/console.log", "a", stdout);
-    if (argc != 4) {
-        printf("Usage: %s <rknn model> <source> <audio device>\n", argv[0]);
+    if (argc != 8) {
+        printf("Usage: %s <retinaface_model> <whisper_encoder> <whisper_decoder> <mel_filters> <vocabulary> <source> <audio_device>\n", argv[0]);
         return -1;
     }
     // The path where the model is located
-    std::string model_path = argv[1];
-    std::string source_name = argv[2];
+    std::string retinaface_model = argv[1];
+    std::string whisper_encoder_model = argv[2];
+    std::string whisper_decoder_model = argv[3];
+    std::string mel_filters_path = argv[4];
+    std::string vocabulary_path = argv[5];
+    std::string source_name = argv[6];
     //USB Mic device
-    std::string audio_device = "plug" + std::string(argv[3]);
+    std::string audio_device = "plug" + std::string(argv[7]);
     
+    std::cout << "Model files:" << std::endl;
+    std::cout << "RetinaFace: " << retinaface_model << std::endl;
+    std::cout << "Whisper Encoder: " << whisper_encoder_model << std::endl;
+    std::cout << "Whisper Decoder: " << whisper_decoder_model << std::endl;
+    std::cout << "Mel Filters: " << mel_filters_path << std::endl;
+    std::cout << "Vocabulary: " << vocabulary_path << std::endl;
+    std::cout << "Source: " << source_name << std::endl;
+    std::cout << "Audio Device: " << audio_device << std::endl;
+
     MLInferenceThread mlThread(
-	model_path,
+	retinaface_model,
 	source_name,
 	jsonResultQueue,
 	bsvarResultQueue,
@@ -89,7 +101,10 @@ int main(int argc, char **argv) {
         bsvar_formatter,
         10);
     ASRThread asrThread(
-        model_path,
+        whisper_encoder_model,
+        whisper_decoder_model,
+        mel_filters_path,
+        vocabulary_path,
         jsonResultQueue,
 	    bsvarResultQueue,
 	    running,
