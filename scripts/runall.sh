@@ -233,12 +233,7 @@ step1_compile_models() {
     echo 'RUN pip3 install ./rknn_toolkit_lite2/packages/rknn_toolkit_lite2-1.6.0-cp310-cp310-linux_aarch64.whl || echo "Optional RKNN Lite install skipped"' >> Dockerfile_ubuntu_20_04_for_cp38
     
     # Build Docker image for model compilation
-    if ! docker images | grep -q "rknn_tk2"; then
-        print_status "Building RKNN Toolkit Docker image..."
-        docker build --rm -t rknn_tk2 -f Dockerfile_ubuntu_20_04_for_cp38 .
-    else
-        print_status "RKNN Toolkit Docker image already exists"
-    fi
+    docker build --rm -t rknn_tk2 -f Dockerfile_ubuntu_20_04_for_cp38 .
 
     # Download RetinaFace model
     cd "$project_root/toolkit/rknn_model_zoo/"
