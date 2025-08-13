@@ -109,7 +109,40 @@ registry write extension bsext-voice-disable-auto-start true
 
 # Camera device override
 registry write extension bsext-voice-video-device /dev/video1
+
+# Disable Image stream server
+registry write networking bs-image-stream-server-port 0
 ```
+
+### Image Stream Server
+
+The **BrightSign Image Stream Server** is a built-in networking feature that serves camera frames over HTTP. When this extension is running, you may want to disable the image stream server to:
+
+- **Prevent conflicts**: Avoid multiple processes accessing the camera simultaneously
+- **Optimize performance**: Reduce system load for better AI processing performance  
+- **Security**: Disable unnecessary network services in production deployments
+
+**Configuration Options:**
+
+| Port Value | Behavior |
+|------------|----------|
+| `0` | **Disabled** - Image stream server is turned off (recommended for this extension) |
+| `8080` | **Default** - Serves camera feed at `http://player-ip:8080/image_stream.jpg` |
+| Custom port | Serves camera feed at the specified port |
+
+**Usage Examples:**
+```bash
+# Disable image stream server (recommended)
+registry write networking bs-image-stream-server-port 0
+
+# Enable on default port 8080
+registry write networking bs-image-stream-server-port 8080
+
+# Enable on custom port
+registry write networking bs-image-stream-server-port 9000
+```
+
+> **Note**: Changes to the image stream server port require a player reboot to take effect.
 
 ### Extension Control
 
