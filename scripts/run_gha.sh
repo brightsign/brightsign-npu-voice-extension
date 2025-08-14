@@ -208,6 +208,30 @@ step2_build_bs_sdk() {
     # Install BSOS SDK
     print_status "Setting up BrightSign OS SDK..."   
     
+    # Prepare docker command
+
+    # Set default target if not provided
+    if [ -z "$TARGET" ]; then
+        TARGET="brightsign-sdk"
+    fi
+
+    # Build quiet flag
+    QUIET_FLAG=""
+    if [ "$QUIET" = true ]; then
+        QUIET_FLAG="-q"
+    fi
+
+    # Build command construction
+    BUILD_CMD="MACHINE=cobra ./bsbb $QUIET_FLAG ${TARGET}"
+
+    # Container commands
+    CONTAINER_CMD=""
+    echo "Will apply patches and build $TARGET..."
+    CONTAINER_CMD="$CONTAINER_CMD /usr/local/bin/setup-patches.sh && "
+
+    # Add the main build command
+    CONTAINER_CMD="$CONTAINER_CMD $BUILD_CMD"
+
     # Check if SDK already exists
     if [ ! -f "brightsign-x86_64-cobra-toolchain-${BRIGHTSIGN_OS_VERSION}.sh" ]; then
         print_status "Building BrightSign SDK (this may take several hours)..."
@@ -217,7 +241,7 @@ step2_build_bs_sdk() {
             -v $(pwd)/srv:/srv \
             -w /home/builder/bsoe/brightsign-oe/build \
             bsoe-build \
-            bash -c "cd /home/builder/bsoe/build && MACHINE=cobra ./bsbb brightsign-sdk"
+            bash -c "${CONTAINER_CMD}"
         
         # Copy the SDK
         cp brightsign-oe/build/tmp-glibc/deploy/sdk/brightsign-x86_64-cobra-toolchain-${BRIGHTSIGN_OS_VERSION}.sh ./
