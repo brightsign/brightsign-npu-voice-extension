@@ -430,7 +430,7 @@ main() {
     fi
     
     # Execute steps
-    # Step 0 - Basic setpu
+    # Step 0 - Basic setup
     step0_setup
 
     # Step 1 - Build Docker Image
