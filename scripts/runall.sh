@@ -14,24 +14,64 @@ NC='\033[0m' # No Color
 
 # Global variables
 AUTO_MODE=false
-SKIP_ARCH_CHECK=false
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+WITHOUT_IMAGE=false
+WITHOUT_SDK=false
+WITHOUT_MODELS=false
+CLEAN_MODE=false
+
+BRIGHTSIGN_OS_MAJOR_VERSION=${BRIGHTSIGN_OS_MAJOR_VERSION:-9.1}
+BRIGHTSIGN_OS_MINOR_VERSION=${BRIGHTSIGN_OS_MINOR_VERSION:-52}
+
 
 # Parse command line arguments
 while [[ $# -gt 0 ]]; do
     case $1 in
-        -auto|--auto)
+        -y|--auto)
             AUTO_MODE=true
             shift
             ;;
-        --skip-arch-check)
-            SKIP_ARCH_CHECK=true
-            shift
+        -v|--version)
+            if [[ $2 =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+                BRIGHTSIGN_OS_MAJOR_VERSION="${2%.*}"
+                BRIGHTSIGN_OS_MINOR_VERSION="${2##*.}"
+            elif [[ $2 =~ ^[0-9]+\.[0-9]+$ ]]; then
+                BRIGHTSIGN_OS_MAJOR_VERSION="$2"
+                BRIGHTSIGN_OS_MINOR_VERSION="0"
+            else
+                echo "Invalid version format: $2. Use major.minor or major.minor.patch"
+                exit 1
+            fi
+            shift 2 
+            ;;
+        --major)
+            BRIGHTSIGN_OS_MAJOR_VERSION="$2"; shift 2 
+            ;;
+        --minor)
+            BRIGHTSIGN_OS_MINOR_VERSION="$2"; shift 2 
+            ;;
+        --without-image)
+            WITHOUT_IMAGE=true; shift 
+            ;;
+        --without-models)
+            WITHOUT_MODELS=true; shift 
+            ;;
+        --without-sdk)
+            WITHOUT_SDK=true; shift 
+            ;;
+        -c|--clean)
+            CLEAN_MODE=true; shift 
             ;;
         -h|--help)
-            echo "Usage: $0 [-auto|--auto] [--skip-arch-check]"
-            echo "  -auto: Run all steps without prompting for confirmation"
-            echo "  --skip-arch-check: Skip x86_64 architecture check (for testing)"
+            echo "Usage: $0 [-y|--auto] [options]"
+            echo "  -y, --auto: Run all steps without prompting for confirmation"
+            echo "  -v, --version VERSION  Set BrightSign OS version (e.g., 9.1.52)"
+            echo "  --major VERSION        Set major.minor version (e.g., 9.1)"
+            echo "  --minor VERSION        Set minor version number (e.g., 52)"
+            echo "  --without-image        Don't build the Docker image"
+            echo "  --without-models       Don't prepare toolkit for building models"
+            echo "  --without-sdk          Don't build the SDK"
+            echo "  --clean                Clean all build artifacts and downloaded files"
             exit 0
             ;;
         *)
@@ -126,32 +166,46 @@ step0_setup() {
     export project_root="$PROJECT_ROOT"
     print_status "Project root set to: $project_root"
 
-    # Clone supporting repositories
-    print_status "Cloning supporting Rockchip repositories..."
-    cd "$project_root"
-    mkdir -p toolkit && cd toolkit
+    # Set OS version variables
+    export BRIGHTSIGN_OS_VERSION=${BRIGHTSIGN_OS_MAJOR_VERSION}.${BRIGHTSIGN_OS_MINOR_VERSION}
 
-    if [ ! -d "rknn-toolkit2" ]; then
-        git clone https://github.com/airockchip/rknn-toolkit2.git --depth 1 --branch v2.3.0
-    else
-        print_status "rknn-toolkit2 already exists"
+
+    print_status "Step 0 completed successfully!"
+    
+    print_warning "MANUAL STEP REQUIRED: You need to unsecure your BrightSign player"
+    print_warning "Follow the instructions in the README.md under 'Unsecure the Player'"
+    print_warning "This involves connecting serial cable and using boot commands"
+}
+
+# STEP 1: Build docker image
+step1_build_docker_image() {
+
+    print_header "STEP 1: Build Docker Image"
+
+    # Build SDK in Docker
+    if [ ! -f "Dockerfile" ]; then
+        print_status "Downloading Dockerfile..."
+        wget https://raw.githubusercontent.com/brightsign/extension-template/refs/heads/main/Dockerfile
     fi
 
-    if [ ! -d "rknn_model_zoo" ]; then
-        git clone https://github.com/airockchip/rknn_model_zoo.git --depth 1 --branch v2.3.0
+    if ! docker images | grep -q "bsoe-build"; then
+        print_status "Building BSOS Docker image..."
+        docker build --rm --build-arg USER_ID=$(id -u) --build-arg GROUP_ID=$(id -g) --ulimit memlock=-1:-1 -t bsoe-build .
     else
-        print_status "rknn_model_zoo already exists"
+        print_status "BSOS Docker image already exists"
     fi
 
-    cd "$project_root"
+    mkdir -p srv   
+
+    print_status "Step 1 completed successfully!"
+}
+
+step2_build_bs_sdk() {
+
+    print_header "STEP 2: Build BrightSign OS SDK"
 
     # Install BSOS SDK
-    print_status "Setting up BrightSign OS SDK..."
-    
-    # Set OS version variables
-    export BRIGHTSIGN_OS_MAJOR_VERSION=9.1
-    export BRIGHTSIGN_OS_MINOR_VERSION=52
-    export BRIGHTSIGN_OS_VERSION=${BRIGHTSIGN_OS_MAJOR_VERSION}.${BRIGHTSIGN_OS_MINOR_VERSION}
+    print_status "Setting up BrightSign OS SDK..."   
     
     # Extract if not already extracted
     if [ ! -d "brightsign-oe" ]; then
@@ -172,21 +226,6 @@ step0_setup() {
         print_status "BrightSign OS source already extracted"
     fi
 
-    # Build SDK in Docker
-    if [ ! -f "Dockerfile" ]; then
-        print_status "Downloading Dockerfile..."
-        wget https://raw.githubusercontent.com/brightsign/extension-template/refs/heads/main/Dockerfile
-    fi
-
-    if ! docker images | grep -q "bsoe-build"; then
-        print_status "Building BSOS Docker image..."
-        docker build --rm --build-arg USER_ID=$(id -u) --build-arg GROUP_ID=$(id -g) --ulimit memlock=-1:-1 -t bsoe-build .
-    else
-        print_status "BSOS Docker image already exists"
-    fi
-
-    mkdir -p srv
-
     # Check if SDK already exists
     if [ ! -f "brightsign-x86_64-cobra-toolchain-${BRIGHTSIGN_OS_VERSION}.sh" ]; then
         print_status "Building BrightSign SDK (this may take several hours)..."
@@ -201,6 +240,14 @@ step0_setup() {
     else
         print_status "SDK already exists"
     fi
+
+    print_status "Step 2 completed successfully!"
+
+}
+
+step3_install_bs_sdk() {
+
+    print_header "STEP 3: Install BrightSign SDK"
 
     # Install SDK
     if [ ! -d "sdk" ]; then
@@ -217,17 +264,34 @@ step0_setup() {
         print_status "SDK already installed"
     fi
 
-    print_status "Step 0 completed successfully!"
-    
-    print_warning "MANUAL STEP REQUIRED: You need to unsecure your BrightSign player"
-    print_warning "Follow the instructions in the README.md under 'Unsecure the Player'"
-    print_warning "This involves connecting serial cable and using boot commands"
+    print_status "Step 3 completed successfully!"
+
 }
 
-# STEP 1: Compile ONNX Models
-step1_compile_models() {
-    print_header "STEP 1: Compile ONNX Models for Rockchip NPU"
-    
+# STEP 4: Compile ONNX Models
+step4_compile_models() {
+
+    print_header "STEP 4: Compile ONNX Models for Rockchip NPU"
+
+    # Clone supporting repositories
+    print_status "Cloning supporting Rockchip repositories..."
+    cd "$project_root"
+    mkdir -p toolkit && cd toolkit
+
+    if [ ! -d "rknn-toolkit2" ]; then
+        git clone https://github.com/airockchip/rknn-toolkit2.git --depth 1 --branch v2.3.0
+    else
+        print_status "rknn-toolkit2 already exists"
+    fi
+
+    if [ ! -d "rknn_model_zoo" ]; then
+        git clone https://github.com/airockchip/rknn_model_zoo.git --depth 1 --branch v2.3.0
+    else
+        print_status "rknn_model_zoo already exists"
+    fi
+
+    cd "$project_root"
+   
     cd "$project_root/toolkit/rknn-toolkit2/rknn-toolkit2/docker/docker_file/ubuntu_20_04_cp38"
     echo 'RUN pip3 install openai-whisper==20231117 onnx onnxsim' >> Dockerfile_ubuntu_20_04_for_cp38
     echo 'RUN pip3 install ./rknn_toolkit_lite2/packages/rknn_toolkit_lite2-1.6.0-cp310-cp310-linux_aarch64.whl || echo "Optional RKNN Lite install skipped"' >> Dockerfile_ubuntu_20_04_for_cp38
@@ -288,12 +352,12 @@ step1_compile_models() {
     cp examples/whisper/model/mel_80_filters.txt "$project_root/install/RK3588/model/"
     cp examples/whisper/model/vocab_en.txt "$project_root/install/RK3588/model/"
 
-    print_status "Step 1 completed successfully!"
+    print_status "Step 4 completed successfully!"
 }
 
-# STEP 3: Build and Test on XT5
-step3_build_xt5() {
-    print_header "STEP 3: Build and Test on XT5"
+# STEP 5: Build and Test on XT5
+step5_build_xt5() {
+    print_header "STEP 5: Build and Test on XT5"
     
     cd "$project_root"
     
@@ -311,12 +375,12 @@ step3_build_xt5() {
     
     cd "$project_root"
     
-    print_status "Step 3 completed successfully!"
+    print_status "Step 5 completed successfully!"
 }
 
-# STEP 4: Package the Extension
-step4_package() {
-    print_header "STEP 4: Package the Extension"
+# STEP 6: Package the Extension
+step6_package() {
+    print_header "STEP 6: Package the Extension"
     
     cd "$project_root"
     
@@ -337,14 +401,146 @@ step4_package() {
 
     cd "$project_root"
     
-    print_status "Step 4 completed successfully!"
+    print_status "Step 6 completed successfully!"
     print_status "Development package: voice-dev-*.zip"
     print_status "Production extension: voice-demo-*.zip"
+}
+
+# Clean function to remove all build artifacts
+clean_build_artifacts() {
+    print_header "CLEANING BUILD ARTIFACTS"
+    
+    cd "$PROJECT_ROOT"
+    
+    # Ask for confirmation unless in auto mode
+    if [ "$AUTO_MODE" != true ]; then
+        print_warning "This will remove all build artifacts, downloaded files, and compiled models."
+        print_warning "The following will be deleted:"
+        print_warning "  - Docker images (bsoe-build, rknn_tk2)"
+        print_warning "  - Downloaded source archives"
+        print_warning "  - BrightSign OS source (brightsign-oe/)"
+        print_warning "  - SDK installation (sdk/)"
+        print_warning "  - Toolkit directory (toolkit/)"
+        print_warning "  - Build directories (build_xt5/)"
+        print_warning "  - Install directory (install/)"
+        print_warning "  - Service directory (srv/)"
+        print_warning "  - Generated packages (*.zip files)"
+        echo
+        read -p "Are you sure you want to continue? (y/N): " -n 1 -r
+        echo
+        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+            print_status "Clean operation cancelled."
+            return 0
+        fi
+    fi
+    
+    # Remove Docker images
+    print_status "Removing Docker images..."
+    docker rmi bsoe-build 2>/dev/null || print_warning "bsoe-build image not found"
+    docker rmi rknn_tk2 2>/dev/null || print_warning "rknn_tk2 image not found"
+    
+    # Remove downloaded archives
+    print_status "Removing downloaded archives..."
+    rm -f brightsign-*.tar.gz
+    rm -f brightsign-x86_64-cobra-toolchain-*.sh
+    
+    # Remove source directories
+    print_status "Removing source directories..."
+    if [ -d "brightsign-oe" ]; then
+        print_status "Removing BrightSign OS source (this may take a moment)..."
+        # First try to make all files writable, then remove
+        chmod -R u+w brightsign-oe/ 2>/dev/null || true
+        rm -rf brightsign-oe/ 2>/dev/null || {
+            print_warning "Standard removal failed, trying alternative method..."
+            # Alternative method: find and delete files first, then directories
+            find brightsign-oe -type f -delete 2>/dev/null || true
+            find brightsign-oe -type d -empty -delete 2>/dev/null || true
+            # If still exists, try once more with sudo (will prompt if needed)
+            if [ -d "brightsign-oe" ]; then
+                print_warning "Directory still exists, you may need to manually remove: brightsign-oe/"
+                print_warning "You can try: sudo rm -rf brightsign-oe/"
+            fi
+        }
+    fi
+    
+    # Remove SDK
+    print_status "Removing SDK installation..."
+    if [ -d "sdk" ]; then
+        chmod -R u+w sdk/ 2>/dev/null || true
+        rm -rf sdk/ 2>/dev/null || {
+            print_warning "SDK removal failed, trying alternative method..."
+            find sdk -type f -delete 2>/dev/null || true
+            find sdk -type d -empty -delete 2>/dev/null || true
+            if [ -d "sdk" ]; then
+                print_warning "SDK directory still exists, you may need to manually remove: sdk/"
+            fi
+        }
+    fi
+    
+    # Remove toolkit
+    print_status "Removing toolkit directory..."
+    if [ -d "toolkit" ]; then
+        chmod -R u+w toolkit/ 2>/dev/null || true
+        rm -rf toolkit/ 2>/dev/null || {
+            print_warning "Toolkit removal failed, trying alternative method..."
+            find toolkit -type f -delete 2>/dev/null || true
+            find toolkit -type d -empty -delete 2>/dev/null || true
+            if [ -d "toolkit" ]; then
+                print_warning "Toolkit directory still exists, you may need to manually remove: toolkit/"
+            fi
+        }
+    fi
+    
+    # Remove build directories
+    print_status "Removing build directories..."
+    rm -rf build_xt5/
+    
+    # Remove install directory
+    print_status "Removing install directory..."
+    rm -rf install/
+    
+    # Remove service directory
+    print_status "Removing service directory..."
+    rm -rf srv/
+    
+    # Remove generated packages
+    print_status "Removing generated packages..."
+    rm -f voice-dev-*.zip
+    rm -f voice-ext-*.zip
+    rm -f voice-demo-*.zip
+    
+    # Remove downloaded Dockerfile if it exists
+    if [ -f "Dockerfile" ] && [ "$(head -1 Dockerfile 2>/dev/null)" = "# This Dockerfile was downloaded" ]; then
+        print_status "Removing downloaded Dockerfile..."
+        rm -f Dockerfile
+    fi
+    
+    # Final status check
+    remaining_dirs=""
+    for dir in brightsign-oe sdk toolkit build_xt5 install srv; do
+        if [ -d "$dir" ]; then
+            remaining_dirs="$remaining_dirs $dir"
+        fi
+    done
+    
+    if [ -z "$remaining_dirs" ]; then
+        print_status "Clean operation completed successfully!"
+        print_status "All build artifacts have been removed."
+    else
+        print_warning "Clean operation completed with some directories remaining:$remaining_dirs"
+        print_warning "These may need manual removal with: sudo rm -rf$remaining_dirs"
+    fi
 }
 
 # Main execution
 main() {
     print_header "BrightSign NPU Voice Extension - Complete Build"
+    
+    # Handle clean mode
+    if [ "$CLEAN_MODE" = true ]; then
+        clean_build_artifacts
+        exit 0
+    fi
     
     if [ "$AUTO_MODE" = true ]; then
         print_status "Running in automatic mode - no prompts"
@@ -354,29 +550,101 @@ main() {
     
     print_status "Project root: $PROJECT_ROOT"
     
+    # Validate option combinations
+    if [[ "$WITHOUT_IMAGE" == true && "$WITHOUT_SDK" != true ]]; then
+        print_warning "Warning: --without-image was specified but --without-sdk was not."
+        print_warning "SDK building requires the Docker image. Enabling --without-sdk automatically."
+        WITHOUT_SDK=true
+    fi
+    
+    if [[ "$WITHOUT_IMAGE" == true && "$WITHOUT_MODELS" != true ]]; then
+        print_warning "Warning: --without-image was specified but --without-models was not."
+        print_warning "Model compilation requires Docker images. Enabling --without-models automatically."
+        WITHOUT_MODELS=true
+    fi
+    
     # Check architecture
-    if [ "$(uname -m)" != "x86_64" ] && [ "$SKIP_ARCH_CHECK" != true ]; then
+    if [ "$(uname -m)" != "x86_64" ]; then
         print_error "This script requires x86_64 architecture"
         print_error "Current architecture: $(uname -m)"
-        print_error "Use --skip-arch-check to bypass this check for testing"
         exit 1
-    elif [ "$SKIP_ARCH_CHECK" = true ]; then
-        print_warning "Skipping architecture check - this is for testing only"
     fi
     
     # Execute steps
+    # Step 0 - Basic setup
     step0_setup
-    step1_compile_models
-    step3_build_xt5
-    step4_package
+    
+    # Only prompt for Docker image build if we're actually going to build it
+    if [[ "$WITHOUT_IMAGE" != true ]]; then
+        prompt_continue "We will now build the Docker image for the BrightSign OS development environment."
+    fi
+
+    # Step 1 - Build Docker Image
+    if [[ "$WITHOUT_IMAGE" != true ]]; then
+        step1_build_docker_image
+        prompt_continue "We will now download and build the BrightSign OS SDK. This may take several hours."
+    else
+        print_status "Skipping preparation of docker image as per --without-image option"
+    fi
+
+    # Step 2 - Build BrightSign SDK
+    if [[ "$WITHOUT_SDK" != true ]]; then
+        step2_build_bs_sdk
+        prompt_continue "We will now install the BrightSign OS SDK."
+    else
+        print_status "Skipping preparation of BrightSign SDK as per --without-sdk option"
+    fi
+
+    # Step 3 - Install BrightSign SDK
+    if [[ "$WITHOUT_SDK" != true ]]; then
+        step3_install_bs_sdk
+        
+        # Only prompt for models if we're going to compile them
+        if [[ "$WITHOUT_MODELS" != true ]]; then
+            prompt_continue "We will now compile the ONNX models for the Rockchip NPU."
+        fi
+    else
+        print_status "Skipping installation of BrightSign SDK as per --without-sdk option"
+    fi
+    
+    # Step 4 - Compile models
+    if [[ "$WITHOUT_MODELS" != true ]]; then
+        step4_compile_models
+        
+        # Only prompt for build if we're going to build
+        if [[ "$WITHOUT_SDK" != true ]]; then
+            prompt_continue "We will now build the application for XT5 players."
+        fi
+    else
+        print_status "Skipping preparation of models toolkit as per --without-models option"
+    fi
+
+    # Step 5 - Build app for XT5
+    if [[ "$WITHOUT_SDK" != true ]]; then
+        step5_build_xt5
+        prompt_continue "We will now package the extension for deployment."
+    else
+        print_status "Skipping build for XT5 as per --without-sdk option"
+    fi
+
+    # Step 6 - Package the Extension
+    if [[ "$WITHOUT_SDK" != true ]]; then
+        step6_package
+    else
+        print_status "Skipping packaging as per --without-sdk option"
+    fi
     
     print_header "BUILD COMPLETE"
     print_status "All steps completed successfully!"
-    print_status "Check the install directory for the built files"
-    print_status "Development package: voice-dev-*.zip"
-    print_status "Production extension: voice-demo-*.zip"
-
-    print_warning "Don't forget to unsecure your BrightSign player as described in the README!"
+    
+    if [[ "$WITHOUT_SDK" != true ]]; then
+        print_status "Check the install directory for the built files"
+        print_status "Development package: voice-dev-*.zip"
+        print_status "Production extension: voice-ext-*.zip"
+        print_warning "Don't forget to unsecure your BrightSign player as described in the README!"
+    else
+        print_status "SDK-dependent steps were skipped. Only setup and model compilation were performed."
+    fi
 }
 
 # Run main function

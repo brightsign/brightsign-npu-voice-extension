@@ -6,7 +6,7 @@ This project provides a complete automated build system for BrightSign extension
 
 **RetinaFace-based gaze detection** - detects faces and determines if people are looking at the screen.
 
-**Whisper encoder-decoder voice recognition** - transcribes speech to text in real-time when user speaks.
+**Whisper encoder-decoder voice recognition** - Gaze detection triggers audio capture and runs the Whisper model to transcribe speech to text in real-time when users speak.
 
 **NPU acceleration** - runs both AI models simultaneously on NPU.
 
@@ -29,11 +29,11 @@ cd brightsign-npu-voice-extension
 # 3. Install the SDK (1 minute)
 # 4. Build C++ applications for all platforms (3-8 minutes)
 # 5. Package extension for deployment (1 minute)
-./scripts/runall.sh
+./scripts/runall.sh --auto
 
 ```
 
-In a typical development workflow, steps 1-3 (setup, model compilation, build and install the SDK) will need to only be done once. Building the apps and packaging them will likely be repeated as the developer changes the app code.
+In a typical development workflow, steps 1-3 (setup, model compilation, build and install the SDK) will need to only be done once. The `runall.sh` script will automatically detect if these steps are already completed and skip them. Building the apps and packaging them will likely be repeated as the developer changes the app code.
 
 **✅ Success**: You now have production-ready extension packages:
 
@@ -68,9 +68,32 @@ Verify that `SECURE_CHECKS` is set to 0. And type `reboot`.
 
 **🎯 Deploy to Player**:
 
-1. Transfer extension package to BrightSign player via DWS
-2. Install: `bash ./ext_npu_voice_install-lvm.sh && reboot`
-3. Extension auto-starts with USB camera and microphone detection
+1. **Transfer extension package** to BrightSign player via DWS (file will be in `/storage/sd`)
+2. **Connect to player** via SSH and navigate to the extension location:
+
+```bash
+cd /storage/sd
+```
+
+3. **Stop any running voice extension** (if applicable):
+
+```bash
+ps | grep voice && kill -9 <pid>
+```
+
+4. **Unzip the extension package**:
+
+```bash
+unzip voice-ext-<timestamp>.zip
+```
+
+5. **Install and reboot**:
+
+```bash
+bash ./ext_npu_voice_install-lvm.sh && reboot
+```
+
+6. **Verification**: Extension auto-starts after reboot with USB camera and microphone detection
 
 ## 📋 Requirements & Prerequisites
 
@@ -116,30 +139,28 @@ registry write networking bs-image-stream-server-port 0
 
 ### Image Stream Server
 
-The **BrightSign Image Stream Server** is a built-in networking feature that serves camera frames over HTTP. When this extension is running, you may want to disable the image stream server to:
+The **BrightSign Image Stream Server** is a built-in networking feature that serves camera frames over HTTP. Image Stream Server will start along with voice detection extension as a standalone daemon running in the background.The bs-image-stream-server continuously monitors a local image file by gaze detection and serves it via HTTP at 30 FPS. It specifically watches /tmp/output.jpg since that is where the BSMP files write their output.
 
-- **Prevent conflicts**: Avoid multiple processes accessing the camera simultaneously
-- **Optimize performance**: Reduce system load for better AI processing performance  
-- **Security**: Disable unnecessary network services in production deployments
+This is intended for development and testing purposes only.
+
+Enable or disable the image stream server using the registry options:
 
 **Configuration Options:**
 
 | Port Value | Behavior |
 |------------|----------|
-| `0` | **Disabled** - Image stream server is turned off (recommended for this extension) |
-| `8080` | **Default** - Serves camera feed at `http://player-ip:8080/image_stream.jpg` |
-| Custom port | Serves camera feed at the specified port |
+| `0` | __Disabled__ - Image stream server is turned off (recommended for this extension) |
+| `20200` | __Default__ - Serves camera feed at `http://player-ip:20200/image_stream.jpg` |
 
 **Usage Examples:**
+
 ```bash
-# Disable image stream server (recommended)
+# Disable image stream server
 registry write networking bs-image-stream-server-port 0
 
-# Enable on default port 8080
-registry write networking bs-image-stream-server-port 8080
+# Enable on default port 20200
+registry write networking bs-image-stream-server-port 20200
 
-# Enable on custom port
-registry write networking bs-image-stream-server-port 9000
 ```
 
 > **Note**: Changes to the image stream server port require a player reboot to take effect.
@@ -212,7 +233,8 @@ faces_attending:1!!faces_in_frame_total:1!!ASR:"transcribed audio text"!!timesta
 ## 🖼️ Decorated Camera Output and Live ASR
 
 Every frame of video captured is processed through the model. Every detected face has a bounding box drawn around it. Faces with two eyes detected have a green box, otherwise the box is red. The decorated image is written to `/tmp/output.jpg` on a RAM disk so it will not impact storage life.
-**Live ASR ** displays the current speech transcription from the Whisper model when viewers are attending and speaking.
+
+**Live ASR** displays the current speech transcription from the Whisper model when viewers are attending and speaking.
 
 ## 📦 Production Deployment
 
@@ -270,23 +292,11 @@ The extension automatically detects platform at runtime:
 
 For in-depth technical information:
 
-### 📄 [Manifest Guide](docs/manifest-guide.md)
+### 🍊 [Design Document](docs/DESIGN.md)
 
-- Extension versioning system
-- Compatibility declarations
-- User configuration options
-
-### 🍊 [Orange Pi Development](OrangePI_Development.md)
-
-- Rapid prototyping workflow
-- Native development environment
-- Testing and debugging guide
-
-### 🛠️ [Development Guide](docs/development-guide.md)
-
-- Development workflow and best practices
-- Testing strategies
-- Debugging techniques
+- Architecture overview and system design
+- AI model integration and NPU utilization
+- Threading model and performance considerations
 
 ## 🗑️ Removing the Extension
 
