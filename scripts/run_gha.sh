@@ -240,8 +240,8 @@ step2_build_bs_sdk() {
     if [ ! -f "brightsign-x86_64-cobra-toolchain-${BRIGHTSIGN_OS_VERSION}.sh" ]; then
         print_status "Building BrightSign SDK (this may take several hours)..."
         docker run ${docker_flags} --rm \
-            -v "${SCRIPT_DIR}/bsoe-recipes:/home/builder/patches:ro" \
-            -v "${SCRIPT_DIR}/sh:/home/builder/host-scripts:ro" \
+            -v $(pwd)/bsoe-recipes:/home/builder/patches:ro \
+            -v $(pwd)/sh:/home/builder/host-scripts:ro \
             -v $(pwd)/srv:/srv \
             -w /home/builder/bsoe/brightsign-oe/build \
             bsoe-build \
