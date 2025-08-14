@@ -208,31 +208,14 @@ step2_build_bs_sdk() {
     # Install BSOS SDK
     print_status "Setting up BrightSign OS SDK..."   
     
-    # Extract if not already extracted
-    if [ ! -d "brightsign-oe" ]; then
-        print_status "Downloading BrightSign OS source..."
-        wget --progress=dot:giga "https://brightsignbiz.s3.amazonaws.com/firmware/opensource/${BRIGHTSIGN_OS_MAJOR_VERSION}/${BRIGHTSIGN_OS_VERSION}/brightsign-${BRIGHTSIGN_OS_VERSION}-src-dl.tar.gz"
-        wget --progress=dot:mega "https://brightsignbiz.s3.amazonaws.com/firmware/opensource/${BRIGHTSIGN_OS_MAJOR_VERSION}/${BRIGHTSIGN_OS_VERSION}/brightsign-${BRIGHTSIGN_OS_VERSION}-src-oe.tar.gz"
-        print_status "Extracting BrightSign OS source..."
-        tar -xzf "brightsign-${BRIGHTSIGN_OS_VERSION}-src-dl.tar.gz"
-        tar -xzf "brightsign-${BRIGHTSIGN_OS_VERSION}-src-oe.tar.gz"
-        
-        # Apply custom recipes
-        rsync -av bsoe-recipes/ brightsign-oe/
-        
-        # Clean up
-        rm "brightsign-${BRIGHTSIGN_OS_VERSION}-src-dl.tar.gz"
-        rm "brightsign-${BRIGHTSIGN_OS_VERSION}-src-oe.tar.gz"
-    else
-        print_status "BrightSign OS source already extracted"
-    fi
-
     # Check if SDK already exists
     if [ ! -f "brightsign-x86_64-cobra-toolchain-${BRIGHTSIGN_OS_VERSION}.sh" ]; then
         print_status "Building BrightSign SDK (this may take several hours)..."
-        docker run -it --rm \
-            -v $(pwd)/brightsign-oe:/home/builder/bsoe \
+        docker run ${docker_flags} --rm \
+            -v "${SCRIPT_DIR}/bsoe-recipes:/home/builder/patches:ro" \
+            -v "${SCRIPT_DIR}/sh:/home/builder/host-scripts:ro" \
             -v $(pwd)/srv:/srv \
+            -w /home/builder/bsoe/brightsign-oe/build \
             bsoe-build \
             bash -c "cd /home/builder/bsoe/build && MACHINE=cobra ./bsbb brightsign-sdk"
         
