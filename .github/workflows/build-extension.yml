@@ -116,7 +116,7 @@ jobs:
 
       - name: Run build script
         run: |
-          ./scripts/runall.sh -y --without-image ${{ env.COMPILE_MODELS_FLAG }} ${{ env.COMPILE_SDK_FLAG }} --version ${{ inputs.bs_os_version }}
+          ./scripts/run_gha.sh -y --without-image ${{ env.COMPILE_MODELS_FLAG }} ${{ env.COMPILE_SDK_FLAG }} --version ${{ inputs.bs_os_version }}
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
