@@ -437,14 +437,14 @@ main() {
     if [[ "$WITHOUT_IMAGE" != true ]]; then
         step1_build_docker_image
     else
-        log "Skipping preparation of docker image as per --without-image option"
+        print_status "Skipping preparation of docker image as per --without-image option"
     fi
 
     # Step 2 - Build BrightSign SDK
     if [[ "$WITHOUT_SDK" != true ]]; then
         step2_build_bs_sdk
     else
-        log "Skipping preparation of BrightSign SDK as per --without-sdk option"
+        print_status "Skipping preparation of BrightSign SDK as per --without-sdk option"
     fi
 
     # Step 3 - Install BrightSign SDK
@@ -454,7 +454,7 @@ main() {
     if [[ "$WITHOUT_MODELS" != true ]]; then
         step4_compile_models
     else
-        log "Skipping preparation of models toolkit as per --without-models option"
+        print_status "Skipping preparation of models toolkit as per --without-models option"
     fi
 
     # Step 5 - Build app for XT5
