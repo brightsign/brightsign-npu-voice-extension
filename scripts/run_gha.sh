@@ -16,22 +16,63 @@ NC='\033[0m' # No Color
 AUTO_MODE=false
 SKIP_ARCH_CHECK=false
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+WITHOUT_IMAGE=false
+WITHOUT_SDK=false
+WITHOUT_MODELS=false
+
+BRIGHTSIGN_OS_MAJOR_VERSION=${BRIGHTSIGN_OS_MAJOR_VERSION:-9.1}
+BRIGHTSIGN_OS_MINOR_VERSION=${BRIGHTSIGN_OS_MINOR_VERSION:-52}
+
 
 # Parse command line arguments
 while [[ $# -gt 0 ]]; do
     case $1 in
-        -auto|--auto)
+        -y|--auto)
             AUTO_MODE=true
             shift
             ;;
         --skip-arch-check)
             SKIP_ARCH_CHECK=true
             shift
+            ;; 
+        -v|--version)
+            if [[ $2 =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+                BRIGHTSIGN_OS_MAJOR_VERSION="${2%.*}"
+                BRIGHTSIGN_OS_MINOR_VERSION="${2##*.}"
+            elif [[ $2 =~ ^[0-9]+\.[0-9]+$ ]]; then
+                BRIGHTSIGN_OS_MAJOR_VERSION="$2"
+                BRIGHTSIGN_OS_MINOR_VERSION="0"
+            else
+                echo "Invalid version format: $2. Use major.minor or major.minor.patch"
+                exit 1
+            fi
+            shift 2 
+            ;;
+        --major)
+            BRIGHTSIGN_OS_MAJOR_VERSION="$2"; shift 2 
+            ;;
+        --minor)
+            BRIGHTSIGN_OS_MINOR_VERSION="$2"; shift 2 
+            ;;
+        --without-image)
+            WITHOUT_IMAGE=true; shift 
+            ;;
+        --without-models)
+            WITHOUT_MODELS=true; shift 
+            ;;
+        --without-sdk)
+            WITHOUT_SDK=true; shift 
             ;;
         -h|--help)
             echo "Usage: $0 [-auto|--auto] [--skip-arch-check]"
-            echo "  -auto: Run all steps without prompting for confirmation"
+            echo "  -y, --auto: Run all steps without prompting for confirmation"
             echo "  --skip-arch-check: Skip x86_64 architecture check (for testing)"
+            echo "  -v, --version VERSION  Set BrightSign OS version (e.g., 9.1.52)"
+            echo "  --major VERSION        Set major.minor version (e.g., 9.1)"
+            echo "  --minor VERSION        Set minor version number (e.g., 52)"
+            echo "  --without-image        Don't build the Docker image"
+            echo "  --without-models       Don't prepare toolkit for building models"
+            echo "  --without-sdk          Don't build the SDK"
             exit 0
             ;;
         *)
@@ -126,6 +167,96 @@ step0_setup() {
     export project_root="$PROJECT_ROOT"
     print_status "Project root set to: $project_root"
 
+    # Set OS version variables
+    export BRIGHTSIGN_OS_VERSION=${BRIGHTSIGN_OS_MAJOR_VERSION}.${BRIGHTSIGN_OS_MINOR_VERSION}
+
+
+    print_status "Step 0 completed successfully!"
+    
+    print_warning "MANUAL STEP REQUIRED: You need to unsecure your BrightSign player"
+    print_warning "Follow the instructions in the README.md under 'Unsecure the Player'"
+    print_warning "This involves connecting serial cable and using boot commands"
+}
+
+# STEP 1: Build docker image
+step1_build_docker_image() {
+
+    print_header "STEP 1: Build Docker Image"
+
+    # Build SDK in Docker
+    if [ ! -f "Dockerfile" ]; then
+        print_status "Downloading Dockerfile..."
+        wget https://raw.githubusercontent.com/brightsign/extension-template/refs/heads/main/Dockerfile
+    fi
+
+    if ! docker images | grep -q "bsoe-build"; then
+        print_status "Building BSOS Docker image..."
+        docker build --rm --build-arg USER_ID=$(id -u) --build-arg GROUP_ID=$(id -g) --ulimit memlock=-1:-1 -t bsoe-build .
+    else
+        print_status "BSOS Docker image already exists"
+    fi
+
+    mkdir -p srv   
+
+    print_status "Step 1 completed successfully!"
+}
+
+step2_build_bs_sdk() {
+
+    print_header "STEP 2: Build BrightSign OS SDK"
+
+    # Install BSOS SDK
+    print_status "Setting up BrightSign OS SDK..."   
+    
+    # Check if SDK already exists
+    if [ ! -f "brightsign-x86_64-cobra-toolchain-${BRIGHTSIGN_OS_VERSION}.sh" ]; then
+        print_status "Building BrightSign SDK (this may take several hours)..."
+        docker run ${docker_flags} --rm \
+            -v "${SCRIPT_DIR}/bsoe-recipes:/home/builder/patches:ro" \
+            -v "${SCRIPT_DIR}/sh:/home/builder/host-scripts:ro" \
+            -v $(pwd)/srv:/srv \
+            -w /home/builder/bsoe/brightsign-oe/build \
+            bsoe-build \
+            bash -c "cd /home/builder/bsoe/build && MACHINE=cobra ./bsbb brightsign-sdk"
+        
+        # Copy the SDK
+        cp brightsign-oe/build/tmp-glibc/deploy/sdk/brightsign-x86_64-cobra-toolchain-${BRIGHTSIGN_OS_VERSION}.sh ./
+    else
+        print_status "SDK already exists"
+    fi
+
+    print_status "Step 2 completed successfully!"
+
+}
+
+step3_install_bs_sdk() {
+
+    print_header "STEP 3: Install BrightSign SDK"
+
+    # Install SDK
+    if [ ! -d "sdk" ]; then
+        print_status "Installing SDK..."
+        ./brightsign-x86_64-cobra-toolchain-${BRIGHTSIGN_OS_VERSION}.sh -d ./sdk -y
+        
+        # Patch SDK with Rockchip libraries
+        cd sdk/sysroots/aarch64-oe-linux/usr/lib
+        if [ ! -f "librknnrt.so" ]; then
+            wget --progress=dot:mega https://github.com/airockchip/rknn-toolkit2/raw/v2.3.2/rknpu2/runtime/Linux/librknn_api/aarch64/librknnrt.so
+        fi
+        cd "$project_root"
+    else
+        print_status "SDK already installed"
+    fi
+
+    print_status "Step 3 completed successfully!"
+
+}
+
+# STEP 4: Compile ONNX Models
+step4_compile_models() {
+
+    print_header "STEP 4: Compile ONNX Models for Rockchip NPU"
+
     # Clone supporting repositories
     print_status "Cloning supporting Rockchip repositories..."
     cd "$project_root"
@@ -144,90 +275,7 @@ step0_setup() {
     fi
 
     cd "$project_root"
-
-    # Install BSOS SDK
-    print_status "Setting up BrightSign OS SDK..."
-    
-    # Set OS version variables
-    export BRIGHTSIGN_OS_MAJOR_VERSION=9.1
-    export BRIGHTSIGN_OS_MINOR_VERSION=52
-    export BRIGHTSIGN_OS_VERSION=${BRIGHTSIGN_OS_MAJOR_VERSION}.${BRIGHTSIGN_OS_MINOR_VERSION}
-    
-    # Extract if not already extracted
-    if [ ! -d "brightsign-oe" ]; then
-        print_status "Downloading BrightSign OS source..."
-        wget "https://brightsignbiz.s3.amazonaws.com/firmware/opensource/${BRIGHTSIGN_OS_MAJOR_VERSION}/${BRIGHTSIGN_OS_VERSION}/brightsign-${BRIGHTSIGN_OS_VERSION}-src-dl.tar.gz"
-        wget "https://brightsignbiz.s3.amazonaws.com/firmware/opensource/${BRIGHTSIGN_OS_MAJOR_VERSION}/${BRIGHTSIGN_OS_VERSION}/brightsign-${BRIGHTSIGN_OS_VERSION}-src-oe.tar.gz"
-        print_status "Extracting BrightSign OS source..."
-        tar -xzf "brightsign-${BRIGHTSIGN_OS_VERSION}-src-dl.tar.gz"
-        tar -xzf "brightsign-${BRIGHTSIGN_OS_VERSION}-src-oe.tar.gz"
-        
-        # Apply custom recipes
-        rsync -av bsoe-recipes/ brightsign-oe/
-        
-        # Clean up
-        rm "brightsign-${BRIGHTSIGN_OS_VERSION}-src-dl.tar.gz"
-        rm "brightsign-${BRIGHTSIGN_OS_VERSION}-src-oe.tar.gz"
-    else
-        print_status "BrightSign OS source already extracted"
-    fi
-
-    # Build SDK in Docker
-    if [ ! -f "Dockerfile" ]; then
-        print_status "Downloading Dockerfile..."
-        wget https://raw.githubusercontent.com/brightsign/extension-template/refs/heads/main/Dockerfile
-    fi
-
-    if ! docker images | grep -q "bsoe-build"; then
-        print_status "Building BSOS Docker image..."
-        docker build --rm --build-arg USER_ID=$(id -u) --build-arg GROUP_ID=$(id -g) --ulimit memlock=-1:-1 -t bsoe-build .
-    else
-        print_status "BSOS Docker image already exists"
-    fi
-
-    mkdir -p srv
-
-    # Check if SDK already exists
-    if [ ! -f "brightsign-x86_64-cobra-toolchain-${BRIGHTSIGN_OS_VERSION}.sh" ]; then
-        print_status "Building BrightSign SDK (this may take several hours)..."
-        docker run -it --rm \
-            -v $(pwd)/brightsign-oe:/home/builder/bsoe \
-            -v $(pwd)/srv:/srv \
-            bsoe-build \
-            bash -c "cd /home/builder/bsoe/build && MACHINE=cobra ./bsbb brightsign-sdk"
-        
-        # Copy the SDK
-        cp brightsign-oe/build/tmp-glibc/deploy/sdk/brightsign-x86_64-cobra-toolchain-${BRIGHTSIGN_OS_VERSION}.sh ./
-    else
-        print_status "SDK already exists"
-    fi
-
-    # Install SDK
-    if [ ! -d "sdk" ]; then
-        print_status "Installing SDK..."
-        ./brightsign-x86_64-cobra-toolchain-${BRIGHTSIGN_OS_VERSION}.sh -d ./sdk -y
-        
-        # Patch SDK with Rockchip libraries
-        cd sdk/sysroots/aarch64-oe-linux/usr/lib
-        if [ ! -f "librknnrt.so" ]; then
-            wget https://github.com/airockchip/rknn-toolkit2/raw/v2.3.2/rknpu2/runtime/Linux/librknn_api/aarch64/librknnrt.so
-        fi
-        cd "$project_root"
-    else
-        print_status "SDK already installed"
-    fi
-
-    print_status "Step 0 completed successfully!"
-    
-    print_warning "MANUAL STEP REQUIRED: You need to unsecure your BrightSign player"
-    print_warning "Follow the instructions in the README.md under 'Unsecure the Player'"
-    print_warning "This involves connecting serial cable and using boot commands"
-}
-
-# STEP 1: Compile ONNX Models
-step1_compile_models() {
-    print_header "STEP 1: Compile ONNX Models for Rockchip NPU"
-    
+   
     cd "$project_root/toolkit/rknn-toolkit2/rknn-toolkit2/docker/docker_file/ubuntu_20_04_cp38"
     echo 'RUN pip3 install openai-whisper==20231117 onnx onnxsim' >> Dockerfile_ubuntu_20_04_for_cp38
     echo 'RUN pip3 install ./rknn_toolkit_lite2/packages/rknn_toolkit_lite2-1.6.0-cp310-cp310-linux_aarch64.whl || echo "Optional RKNN Lite install skipped"' >> Dockerfile_ubuntu_20_04_for_cp38
@@ -288,12 +336,12 @@ step1_compile_models() {
     cp examples/whisper/model/mel_80_filters.txt "$project_root/install/RK3588/model/"
     cp examples/whisper/model/vocab_en.txt "$project_root/install/RK3588/model/"
 
-    print_status "Step 1 completed successfully!"
+    print_status "Step 4 completed successfully!"
 }
 
-# STEP 3: Build and Test on XT5
-step3_build_xt5() {
-    print_header "STEP 3: Build and Test on XT5"
+# STEP 5: Build and Test on XT5
+step5_build_xt5() {
+    print_header "STEP 5: Build and Test on XT5"
     
     cd "$project_root"
     
@@ -311,12 +359,12 @@ step3_build_xt5() {
     
     cd "$project_root"
     
-    print_status "Step 3 completed successfully!"
+    print_status "Step 5 completed successfully!"
 }
 
-# STEP 4: Package the Extension
-step4_package() {
-    print_header "STEP 4: Package the Extension"
+# STEP 6: Package the Extension
+step6_package() {
+    print_header "STEP 6: Package the Extension"
     
     cd "$project_root"
     
@@ -337,7 +385,7 @@ step4_package() {
 
     cd "$project_root"
     
-    print_status "Step 4 completed successfully!"
+    print_status "Step 6 completed successfully!"
     print_status "Development package: voice-dev-*.zip"
     print_status "Production extension: voice-demo-*.zip"
 }
@@ -365,10 +413,38 @@ main() {
     fi
     
     # Execute steps
+    # Step 0 - Basic setup
     step0_setup
-    step1_compile_models
-    step3_build_xt5
-    step4_package
+
+    # Step 1 - Build Docker Image
+    if [[ "$WITHOUT_IMAGE" != true ]]; then
+        step1_build_docker_image
+    else
+        print_status "Skipping preparation of docker image as per --without-image option"
+    fi
+
+    # Step 2 - Build BrightSign SDK
+    if [[ "$WITHOUT_SDK" != true ]]; then
+        step2_build_bs_sdk
+    else
+        print_status "Skipping preparation of BrightSign SDK as per --without-sdk option"
+    fi
+
+    # Step 3 - Install BrightSign SDK
+    step3_install_bs_sdk
+    
+    # Step 4 - Compile models
+    if [[ "$WITHOUT_MODELS" != true ]]; then
+        step4_compile_models
+    else
+        print_status "Skipping preparation of models toolkit as per --without-models option"
+    fi
+
+    # Step 5 - Build app for XT5
+    step5_build_xt5
+
+    # Step 6 - Package the Extension
+    step6_package
     
     print_header "BUILD COMPLETE"
     print_status "All steps completed successfully!"

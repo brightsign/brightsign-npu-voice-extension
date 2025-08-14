@@ -114,9 +114,9 @@ jobs:
           echo "BUILD_SDK=false" >> "$GITHUB_ENV"
           aws s3 ls ${{ env.S3_URL }}/sdk/brightsign-x86_64-cobra-toolchain-${{ env.BRIGHTSIGN_OS_VERSION }}.sh && aws s3 cp ${{ env.S3_URL }}/sdk/brightsign-x86_64-cobra-toolchain-${{ env.BRIGHTSIGN_OS_VERSION }}.sh . || (echo "COMPILE_SDK_FLAG=" >> "$GITHUB_ENV") 
 
-      - name: Run setup command without build
+      - name: Run build script
         run: |
-          ./scripts/runall.sh -y --without-image ${{ env.COMPILE_MODELS_FLAG }} ${{ env.COMPILE_SDK_FLAG }} --version ${{ inputs.bs_os_version }}
+          ./scripts/run_gha.sh -y --without-image ${{ env.COMPILE_MODELS_FLAG }} ${{ env.COMPILE_SDK_FLAG }} --version ${{ inputs.bs_os_version }}
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
