@@ -120,6 +120,7 @@ jobs:
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
+        if: always()
         with:
           role-to-assume: arn:aws:iam::207998159418:role/github-actions-npu-repos-role
           aws-region: us-east-1      
@@ -131,7 +132,8 @@ jobs:
           aws s3 cp install-models.tgz ${{ env.S3_URL }}/models/install-models.tgz
 
       - name: Upload SDK to S3
-        if: env.BUILD_SDK != 'false'
+        #if: env.BUILD_SDK != 'false'
+        if: always()
         run: |
           aws s3 cp ./brightsign-x86_64-cobra-toolchain-${{ env.BRIGHTSIGN_OS_VERSION }}.sh ${{ env.S3_URL }}/sdk/ 
 

@@ -248,7 +248,8 @@ step2_build_bs_sdk() {
             bash -c "${CONTAINER_CMD}"
         
         # Copy the SDK
-        cp brightsign-oe/build/tmp-glibc/deploy/sdk/brightsign-x86_64-cobra-toolchain-${BRIGHTSIGN_OS_VERSION}.sh ./
+        # cp brightsign-oe/build/tmp-glibc/deploy/sdk/brightsign-x86_64-cobra-toolchain-${BRIGHTSIGN_OS_VERSION}.sh ./
+        cp srv/brightsign-x86_64-cobra-toolchain-${BRIGHTSIGN_OS_VERSION}.sh ./
     else
         print_status "SDK already exists"
     fi
