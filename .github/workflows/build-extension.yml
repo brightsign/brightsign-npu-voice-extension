@@ -135,6 +135,7 @@ jobs:
         #if: env.BUILD_SDK != 'false'
         if: always()
         run: |
+          find ./ -name brightsign-x86_64-cobra-toolchain-${{ env.BRIGHTSIGN_OS_VERSION }}.sh | xargs -I {} aws s3 cp {} ${{ env.S3_URL }}/sdk/ 
           aws s3 cp ./brightsign-x86_64-cobra-toolchain-${{ env.BRIGHTSIGN_OS_VERSION }}.sh ${{ env.S3_URL }}/sdk/ 
 
       - name: Export dev packages
