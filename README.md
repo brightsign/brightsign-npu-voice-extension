@@ -2,6 +2,12 @@
 
 **Automated Voice detection extension for BrightSign Series 5 players using Rockchip NPU acceleration.**
 
+## Release Status
+
+This is an **ALPHA** quality release, intended mostly for educational purposes. This model is not tuned for optimum performance and has had only standard testing.  **NOT RECOMMENDED FOR PRODUCTION USE**.
+
+## Description
+
 This project provides a complete automated build system for BrightSign extensions that combine:
 
 **RetinaFace-based gaze detection** - detects faces and determines if people are looking at the screen.
