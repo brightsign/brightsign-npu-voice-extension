@@ -19,9 +19,11 @@ WITHOUT_IMAGE=false
 WITHOUT_SDK=false
 WITHOUT_MODELS=false
 CLEAN_MODE=false
+DOCKER_FLAGS=""
 
 BRIGHTSIGN_OS_MAJOR_VERSION=${BRIGHTSIGN_OS_MAJOR_VERSION:-9.1}
 BRIGHTSIGN_OS_MINOR_VERSION=${BRIGHTSIGN_OS_MINOR_VERSION:-52}
+
 
 
 # Parse command line arguments
@@ -185,7 +187,7 @@ step1_build_docker_image() {
     # Build SDK in Docker
     if [ ! -f "Dockerfile" ]; then
         print_status "Downloading Dockerfile..."
-        wget https://raw.githubusercontent.com/brightsign/extension-template/refs/heads/main/Dockerfile
+        wget --progress=dot:giga https://raw.githubusercontent.com/brightsign/extension-template/refs/heads/main/Dockerfile
     fi
 
     if ! docker images | grep -q "bsoe-build"; then
@@ -210,8 +212,8 @@ step2_build_bs_sdk() {
     # Extract if not already extracted
     if [ ! -d "brightsign-oe" ]; then
         print_status "Downloading BrightSign OS source..."
-        wget "https://brightsignbiz.s3.amazonaws.com/firmware/opensource/${BRIGHTSIGN_OS_MAJOR_VERSION}/${BRIGHTSIGN_OS_VERSION}/brightsign-${BRIGHTSIGN_OS_VERSION}-src-dl.tar.gz"
-        wget "https://brightsignbiz.s3.amazonaws.com/firmware/opensource/${BRIGHTSIGN_OS_MAJOR_VERSION}/${BRIGHTSIGN_OS_VERSION}/brightsign-${BRIGHTSIGN_OS_VERSION}-src-oe.tar.gz"
+        wget --progress=dot:giga "https://brightsignbiz.s3.amazonaws.com/firmware/opensource/${BRIGHTSIGN_OS_MAJOR_VERSION}/${BRIGHTSIGN_OS_VERSION}/brightsign-${BRIGHTSIGN_OS_VERSION}-src-dl.tar.gz"
+        wget --progress=dot:giga "https://brightsignbiz.s3.amazonaws.com/firmware/opensource/${BRIGHTSIGN_OS_MAJOR_VERSION}/${BRIGHTSIGN_OS_VERSION}/brightsign-${BRIGHTSIGN_OS_VERSION}-src-oe.tar.gz"
         print_status "Extracting BrightSign OS source..."
         tar -xzf "brightsign-${BRIGHTSIGN_OS_VERSION}-src-dl.tar.gz"
         tar -xzf "brightsign-${BRIGHTSIGN_OS_VERSION}-src-oe.tar.gz"
@@ -229,7 +231,7 @@ step2_build_bs_sdk() {
     # Check if SDK already exists
     if [ ! -f "brightsign-x86_64-cobra-toolchain-${BRIGHTSIGN_OS_VERSION}.sh" ]; then
         print_status "Building BrightSign SDK (this may take several hours)..."
-        docker run -it --rm \
+        docker run ${DOCKER_FLAGS} --rm \
             -v $(pwd)/brightsign-oe:/home/builder/bsoe \
             -v $(pwd)/srv:/srv \
             bsoe-build \
@@ -314,7 +316,7 @@ step4_compile_models() {
     # Compile RetinaFace model for RK3588 (XT-5 players)
     if [ ! -f "examples/RetinaFace/model/RK3588/RetinaFace.rknn" ]; then
         print_status "Compiling model for RK3588 (XT-5 players)..."
-        docker run -it --rm -v $(pwd):/zoo rknn_tk2 /bin/bash \
+        docker run ${DOCKER_FLAGS} --rm -v $(pwd):/zoo rknn_tk2 /bin/bash \
             -c "cd /zoo/examples/RetinaFace/python && python convert.py ../model/RetinaFace_mobile320.onnx rk3588 i8 ../model/RK3588/RetinaFace.rknn"
     else
         print_status "RK3588 RetinaFace model already compiled"
@@ -326,7 +328,7 @@ step4_compile_models() {
     if [ ! -f "examples/whisper/model/whisper_decoder_base.onnx" ] ||
        [ ! -f "examples/whisper/model/whisper_encoder_base.onnx" ]; then
         print_status "Downloading Whisper models..."
-        docker run -it --rm -v $(pwd):/zoo rknn_tk2 /bin/bash -c "cd /zoo/examples/whisper/python && python export_onnx.py --model_type base --n_mels 80"
+        docker run ${DOCKER_FLAGS} --rm -v $(pwd):/zoo rknn_tk2 /bin/bash -c "cd /zoo/examples/whisper/python && python export_onnx.py --model_type base --n_mels 80"
     else
         print_status "Whisper models already downloaded"
     fi
@@ -335,9 +337,9 @@ step4_compile_models() {
     if [ ! -f "examples/whisper/model/RK3588/whisper_decoder_base.rknn" ] ||
        [ ! -f "examples/whisper/model/RK3588/whisper_encoder_base.rknn" ]; then
         print_status "Compiling model for RK3588 (XT-5 players)..."
-        docker run -it --rm -v $(pwd):/zoo rknn_tk2 /bin/bash \
+        docker run ${DOCKER_FLAGS} --rm -v $(pwd):/zoo rknn_tk2 /bin/bash \
         -c "cd /zoo/examples/whisper/python && python convert.py ../model/whisper_decoder_base.onnx rk3588 fp ../model/RK3588/whisper_decoder_base.rknn"
-        docker run -it --rm -v $(pwd):/zoo rknn_tk2 /bin/bash \
+        docker run ${DOCKER_FLAGS} --rm -v $(pwd):/zoo rknn_tk2 /bin/bash \
         -c "cd /zoo/examples/whisper/python && python convert.py ../model/whisper_encoder_base.onnx rk3588 fp ../model/RK3588/whisper_encoder_base.rknn"
     else
         print_status "RK3588 model already compiled"
@@ -541,6 +543,11 @@ main() {
         clean_build_artifacts
         exit 0
     fi
+
+    if [ -t 0 ]; then
+        DOCKER_FLAGS="-it --rm"
+    fi
+    
     
     if [ "$AUTO_MODE" = true ]; then
         print_status "Running in automatic mode - no prompts"
