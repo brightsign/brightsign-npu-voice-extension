@@ -118,8 +118,8 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: brightsign/bs-image-stream-server
-          token: ${{ secrets.GITHUB_TOKEN }}
-          path: ./build_xt5
+          token: ${{ secrets.BS_IMAGE_STREAM_SERVER_READ }}
+          path: ./build_xt5/bs-image-stream-server
 
       - name: Run build script
         run: |
