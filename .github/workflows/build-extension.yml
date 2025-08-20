@@ -66,42 +66,7 @@ jobs:
 
           mkdir -p srv
           chmod 777 srv
-
-
-      - name: Check if Docker image exists
-        id: check-image
-        run: |
-          cmd="$(aws ecr describe-images --repository-name ${{ env.DOCKER_IMAGE }} --image-ids imageTag=${{ inputs.bs_os_version }} ||:)"
-          if [[ -z "$cmd" ]]; then
-            echo "IMAGE_EXISTS=false" >> "$GITHUB_ENV"
-          else
-            echo "IMAGE_EXISTS=true" >> "$GITHUB_ENV"
-          fi
-
-      - name: Get Docker image
-        if: ${{ env.IMAGE_EXISTS == 'true' }}
-        run: |
-          docker pull ${{ steps.login-ecr.outputs.registry }}/${{ env.DOCKER_IMAGE }}:${{ env.BRIGHTSIGN_OS_VERSION }}
-
-      - name: Set up Docker Buildx
-        if: ${{ env.IMAGE_EXISTS == 'false' }}
-        uses: docker/setup-buildx-action@v3
-
-      - name: Build Docker image
-        if: ${{ env.IMAGE_EXISTS == 'false' }}
-        id: dockerbuild
-        uses: docker/build-push-action@v6
-        with:
-          build-args: |
-              BRIGHTSIGN_OS_VERSION=${{ env.BRIGHTSIGN_OS_VERSION }}
-          file: ./Dockerfile
-          tags: ${{ steps.login-ecr.outputs.registry }}/${{ env.DOCKER_IMAGE }}:${{ env.BRIGHTSIGN_OS_VERSION }}
-          load: true
-          push: true      
-
-      - name: Tag Docker image
-        run: |
-          docker tag ${{ steps.login-ecr.outputs.registry }}/${{ env.DOCKER_IMAGE }}:${{ env.BRIGHTSIGN_OS_VERSION }} ${{ env.DOCKER_IMAGE }}
+          mkdir build_xt5
 
       - name: Download models
         if: ${{ inputs.build-models == false }}
@@ -112,14 +77,22 @@ jobs:
         if: ${{ inputs.build-sdk == false }}
         run: |
           echo "BUILD_SDK=false" >> "$GITHUB_ENV"
-          aws s3 ls ${{ env.S3_URL }}/sdk/brightsign-x86_64-cobra-toolchain-${{ env.BRIGHTSIGN_OS_VERSION }}.sh && aws s3 cp ${{ env.S3_URL }}/sdk/brightsign-x86_64-cobra-toolchain-${{ env.BRIGHTSIGN_OS_VERSION }}.sh . || (echo "COMPILE_SDK_FLAG=" >> "$GITHUB_ENV") 
+          aws s3 ls ${{ env.S3_URL }}/sdk/brightsign-x86_64-cobra-toolchain-${{ env.BRIGHTSIGN_OS_VERSION }}.sh && aws s3 cp ${{ env.S3_URL }}/sdk/brightsign-x86_64-cobra-toolchain-${{ env.BRIGHTSIGN_OS_VERSION }}.sh . && chmod +x ./brightsign-x86_64-cobra-toolchain-${{ env.BRIGHTSIGN_OS_VERSION }}.sh || (echo "COMPILE_SDK_FLAG=" >> "$GITHUB_ENV") 
+
+      - name: Prepare build dir
+        uses: actions/checkout@v4
+        with:
+          repository: brightsign/bs-image-stream-server
+          token: ${{ secrets.BS_IMAGE_STREAM_SERVER_READ }}
+          path: ./build_xt5/bs-image-stream-server
 
       - name: Run build script
         run: |
-          ./scripts/run_gha.sh -y --without-image ${{ env.COMPILE_MODELS_FLAG }} ${{ env.COMPILE_SDK_FLAG }} --version ${{ inputs.bs_os_version }}
+          ./scripts/runall.sh -y ${{ env.COMPILE_MODELS_FLAG }} ${{ env.COMPILE_SDK_FLAG }} --without-clean --version ${{ inputs.bs_os_version }}
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
+        if: always()
         with:
           role-to-assume: arn:aws:iam::207998159418:role/github-actions-npu-repos-role
           aws-region: us-east-1      
@@ -137,5 +110,5 @@ jobs:
 
       - name: Export dev packages
         run: |
-          aws s3 cp ./yolo-dev-*.zip ${{ env.S3_URL }}/packages/development/
-          aws s3 cp ./yolo-ext-*.zip ${{ env.S3_URL }}/packages/extension/
+          aws s3 cp ./*-dev-*.zip ${{ env.S3_URL }}/packages/development/
+          aws s3 cp ./*-ext-*.zip ${{ env.S3_URL }}/packages/extension/

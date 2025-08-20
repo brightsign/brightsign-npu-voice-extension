@@ -15,10 +15,12 @@ NC='\033[0m' # No Color
 # Global variables
 AUTO_MODE=false
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+WITHOUT_CLEAN=false
 WITHOUT_IMAGE=false
 WITHOUT_SDK=false
 WITHOUT_MODELS=false
 CLEAN_MODE=false
+DOCKER_FLAGS=""
 
 BRIGHTSIGN_OS_MAJOR_VERSION=${BRIGHTSIGN_OS_MAJOR_VERSION:-9.1}
 BRIGHTSIGN_OS_MINOR_VERSION=${BRIGHTSIGN_OS_MINOR_VERSION:-52}
@@ -50,15 +52,15 @@ while [[ $# -gt 0 ]]; do
         --minor)
             BRIGHTSIGN_OS_MINOR_VERSION="$2"; shift 2 
             ;;
-        --without-image)
-            WITHOUT_IMAGE=true; shift 
-            ;;
         --without-models)
             WITHOUT_MODELS=true; shift 
             ;;
         --without-sdk)
             WITHOUT_SDK=true; shift 
             ;;
+        --without-clean)
+            WITHOUT_CLEAN=true; shift
+            ;;	    
         -c|--clean)
             CLEAN_MODE=true; shift 
             ;;
@@ -68,7 +70,7 @@ while [[ $# -gt 0 ]]; do
             echo "  -v, --version VERSION  Set BrightSign OS version (e.g., 9.1.52)"
             echo "  --major VERSION        Set major.minor version (e.g., 9.1)"
             echo "  --minor VERSION        Set minor version number (e.g., 52)"
-            echo "  --without-image        Don't build the Docker image"
+            echo "  --without-clean        Don't remove build_xxx folders"
             echo "  --without-models       Don't prepare toolkit for building models"
             echo "  --without-sdk          Don't build the SDK"
             echo "  --clean                Clean all build artifacts and downloaded files"
@@ -210,8 +212,8 @@ step2_build_bs_sdk() {
     # Extract if not already extracted
     if [ ! -d "brightsign-oe" ]; then
         print_status "Downloading BrightSign OS source..."
-        wget "https://brightsignbiz.s3.amazonaws.com/firmware/opensource/${BRIGHTSIGN_OS_MAJOR_VERSION}/${BRIGHTSIGN_OS_VERSION}/brightsign-${BRIGHTSIGN_OS_VERSION}-src-dl.tar.gz"
-        wget "https://brightsignbiz.s3.amazonaws.com/firmware/opensource/${BRIGHTSIGN_OS_MAJOR_VERSION}/${BRIGHTSIGN_OS_VERSION}/brightsign-${BRIGHTSIGN_OS_VERSION}-src-oe.tar.gz"
+        wget --progress=dot:giga "https://brightsignbiz.s3.amazonaws.com/firmware/opensource/${BRIGHTSIGN_OS_MAJOR_VERSION}/${BRIGHTSIGN_OS_VERSION}/brightsign-${BRIGHTSIGN_OS_VERSION}-src-dl.tar.gz"
+        wget --progress=dot:giga "https://brightsignbiz.s3.amazonaws.com/firmware/opensource/${BRIGHTSIGN_OS_MAJOR_VERSION}/${BRIGHTSIGN_OS_VERSION}/brightsign-${BRIGHTSIGN_OS_VERSION}-src-oe.tar.gz"
         print_status "Extracting BrightSign OS source..."
         tar -xzf "brightsign-${BRIGHTSIGN_OS_VERSION}-src-dl.tar.gz"
         tar -xzf "brightsign-${BRIGHTSIGN_OS_VERSION}-src-oe.tar.gz"
@@ -229,7 +231,7 @@ step2_build_bs_sdk() {
     # Check if SDK already exists
     if [ ! -f "brightsign-x86_64-cobra-toolchain-${BRIGHTSIGN_OS_VERSION}.sh" ]; then
         print_status "Building BrightSign SDK (this may take several hours)..."
-        docker run -it --rm \
+        docker run ${DOCKER_FLAGS} --rm \
             -v $(pwd)/brightsign-oe:/home/builder/bsoe \
             -v $(pwd)/srv:/srv \
             bsoe-build \
@@ -314,7 +316,7 @@ step4_compile_models() {
     # Compile RetinaFace model for RK3588 (XT-5 players)
     if [ ! -f "examples/RetinaFace/model/RK3588/RetinaFace.rknn" ]; then
         print_status "Compiling model for RK3588 (XT-5 players)..."
-        docker run -it --rm -v $(pwd):/zoo rknn_tk2 /bin/bash \
+        docker run ${DOCKER_FLAGS} --rm -v $(pwd):/zoo rknn_tk2 /bin/bash \
             -c "cd /zoo/examples/RetinaFace/python && python convert.py ../model/RetinaFace_mobile320.onnx rk3588 i8 ../model/RK3588/RetinaFace.rknn"
     else
         print_status "RK3588 RetinaFace model already compiled"
@@ -326,7 +328,7 @@ step4_compile_models() {
     if [ ! -f "examples/whisper/model/whisper_decoder_base.onnx" ] ||
        [ ! -f "examples/whisper/model/whisper_encoder_base.onnx" ]; then
         print_status "Downloading Whisper models..."
-        docker run -it --rm -v $(pwd):/zoo rknn_tk2 /bin/bash -c "cd /zoo/examples/whisper/python && python export_onnx.py --model_type base --n_mels 80"
+        docker run ${DOCKER_FLAGS} --rm -v $(pwd):/zoo rknn_tk2 /bin/bash -c "cd /zoo/examples/whisper/python && python export_onnx.py --model_type base --n_mels 80"
     else
         print_status "Whisper models already downloaded"
     fi
@@ -335,9 +337,9 @@ step4_compile_models() {
     if [ ! -f "examples/whisper/model/RK3588/whisper_decoder_base.rknn" ] ||
        [ ! -f "examples/whisper/model/RK3588/whisper_encoder_base.rknn" ]; then
         print_status "Compiling model for RK3588 (XT-5 players)..."
-        docker run -it --rm -v $(pwd):/zoo rknn_tk2 /bin/bash \
+        docker run ${DOCKER_FLAGS} --rm -v $(pwd):/zoo rknn_tk2 /bin/bash \
         -c "cd /zoo/examples/whisper/python && python convert.py ../model/whisper_decoder_base.onnx rk3588 fp ../model/RK3588/whisper_decoder_base.rknn"
-        docker run -it --rm -v $(pwd):/zoo rknn_tk2 /bin/bash \
+        docker run ${DOCKER_FLAGS} --rm -v $(pwd):/zoo rknn_tk2 /bin/bash \
         -c "cd /zoo/examples/whisper/python && python convert.py ../model/whisper_encoder_base.onnx rk3588 fp ../model/RK3588/whisper_encoder_base.rknn"
     else
         print_status "RK3588 model already compiled"
@@ -366,7 +368,9 @@ step5_build_xt5() {
 
     # Build for XT5 (RK3588)
     print_status "Building for XT5 (RK3588)..."
-    rm -rf build_xt5
+    if [[ "$WITHOUT_CLEAN" != true ]]; then
+      rm -rf build_xt5
+    fi
     mkdir -p build_xt5 && cd build_xt5
     
     cmake .. -DOECORE_TARGET_SYSROOT="${OECORE_TARGET_SYSROOT}" -DTARGET_SOC="rk3588"
@@ -541,6 +545,11 @@ main() {
         clean_build_artifacts
         exit 0
     fi
+
+    if [ -t 0 ]; then
+        DOCKER_FLAGS="-it"
+    fi
+
     
     if [ "$AUTO_MODE" = true ]; then
         print_status "Running in automatic mode - no prompts"
@@ -575,16 +584,17 @@ main() {
     step0_setup
     
     # Only prompt for Docker image build if we're actually going to build it
-    if [[ "$WITHOUT_IMAGE" != true ]]; then
+    if [[ "$WITHOUT_SDK" != true ]]; then
         prompt_continue "We will now build the Docker image for the BrightSign OS development environment."
     fi
 
     # Step 1 - Build Docker Image
-    if [[ "$WITHOUT_IMAGE" != true ]]; then
+    if [[ "$WITHOUT_SDK" != true ]]; then
         step1_build_docker_image
         prompt_continue "We will now download and build the BrightSign OS SDK. This may take several hours."
     else
-        print_status "Skipping preparation of docker image as per --without-image option"
+        print_status "Skipping preparation of docker image as per --without-sdk option"
+
     fi
 
     # Step 2 - Build BrightSign SDK
@@ -596,15 +606,11 @@ main() {
     fi
 
     # Step 3 - Install BrightSign SDK
-    if [[ "$WITHOUT_SDK" != true ]]; then
-        step3_install_bs_sdk
+    step3_install_bs_sdk
         
-        # Only prompt for models if we're going to compile them
-        if [[ "$WITHOUT_MODELS" != true ]]; then
-            prompt_continue "We will now compile the ONNX models for the Rockchip NPU."
-        fi
-    else
-        print_status "Skipping installation of BrightSign SDK as per --without-sdk option"
+    # Only prompt for models if we're going to compile them
+    if [[ "$WITHOUT_MODELS" != true ]]; then
+         prompt_continue "We will now compile the ONNX models for the Rockchip NPU."
     fi
     
     # Step 4 - Compile models
@@ -620,19 +626,11 @@ main() {
     fi
 
     # Step 5 - Build app for XT5
-    if [[ "$WITHOUT_SDK" != true ]]; then
-        step5_build_xt5
-        prompt_continue "We will now package the extension for deployment."
-    else
-        print_status "Skipping build for XT5 as per --without-sdk option"
-    fi
+    step5_build_xt5
 
     # Step 6 - Package the Extension
-    if [[ "$WITHOUT_SDK" != true ]]; then
-        step6_package
-    else
-        print_status "Skipping packaging as per --without-sdk option"
-    fi
+    step6_package
+
     
     print_header "BUILD COMPLETE"
     print_status "All steps completed successfully!"
