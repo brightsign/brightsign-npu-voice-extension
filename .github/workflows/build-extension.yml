@@ -66,7 +66,7 @@ jobs:
 
           mkdir -p srv
           chmod 777 srv
-
+          mkdir build_xt5
 
 #      - name: Check if Docker image exists
 #        id: check-image
@@ -113,6 +113,13 @@ jobs:
         run: |
           echo "BUILD_SDK=false" >> "$GITHUB_ENV"
           aws s3 ls ${{ env.S3_URL }}/sdk/brightsign-x86_64-cobra-toolchain-${{ env.BRIGHTSIGN_OS_VERSION }}.sh && aws s3 cp ${{ env.S3_URL }}/sdk/brightsign-x86_64-cobra-toolchain-${{ env.BRIGHTSIGN_OS_VERSION }}.sh . || (echo "COMPILE_SDK_FLAG=" >> "$GITHUB_ENV") 
+
+      - name: Prepare build dir
+        uses: actions/checkout@v4
+        with:
+          repository: brightsign/bs-image-stream-server
+          token: ${{ secrets.GITHUB_TOKEN }}
+          path: ./build_xt5
 
       - name: Run build script
         run: |
