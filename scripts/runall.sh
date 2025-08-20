@@ -15,6 +15,7 @@ NC='\033[0m' # No Color
 # Global variables
 AUTO_MODE=false
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+WITHOUT_CLEAN=false
 WITHOUT_IMAGE=false
 WITHOUT_SDK=false
 WITHOUT_MODELS=false
@@ -61,6 +62,9 @@ while [[ $# -gt 0 ]]; do
         --without-sdk)
             WITHOUT_SDK=true; shift 
             ;;
+        --without-clean)
+            WITHOUT_CLEAN=true; shift
+            ;;	    
         -c|--clean)
             CLEAN_MODE=true; shift 
             ;;
@@ -70,6 +74,7 @@ while [[ $# -gt 0 ]]; do
             echo "  -v, --version VERSION  Set BrightSign OS version (e.g., 9.1.52)"
             echo "  --major VERSION        Set major.minor version (e.g., 9.1)"
             echo "  --minor VERSION        Set minor version number (e.g., 52)"
+            echo "  --without-clean        Don't remove build_xxx folders"
             echo "  --without-image        Don't build the Docker image"
             echo "  --without-models       Don't prepare toolkit for building models"
             echo "  --without-sdk          Don't build the SDK"
@@ -368,7 +373,9 @@ step5_build_xt5() {
 
     # Build for XT5 (RK3588)
     print_status "Building for XT5 (RK3588)..."
-    rm -rf build_xt5
+    if [[ "$WITHOUT_CLEAN" != true ]]; then
+      rm -rf build_xt5
+    fi
     mkdir -p build_xt5 && cd build_xt5
     
     cmake .. -DOECORE_TARGET_SYSROOT="${OECORE_TARGET_SYSROOT}" -DTARGET_SOC="rk3588"
