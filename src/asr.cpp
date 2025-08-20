@@ -1,6 +1,7 @@
 #include "asr.h"
 #include <thread>
 #include <iostream>
+#include <algorithm>
 #include "audio_utils.h"
 #include <sndfile.h>
 #include <alsa/asoundlib.h>
@@ -107,18 +108,18 @@ ASRThread::~ASRThread() {
  * - Uses silence detection to determine speech boundaries
  */
 bool record_on_vad(const std::string& device, const std::string& wav_path) {
-    constexpr int VAD_MODE = 3;
-    constexpr int MAX_SILENCE_FRAMES = 100; //2 seconds of silence
-    constexpr int MIN_SAMPLES = 16000; // 1 second minimum
-    constexpr int MAX_TOTAL_FRAMES_MULTIPLIER = 2;
-    constexpr int MIN_SPEECH_FRAMES = 25;
+    constexpr int VAD_MODE = 2;  // Moderate aggressiveness
+    constexpr int MAX_SILENCE_FRAMES = 80; // Reduced to 80 (1.6 seconds) for more responsive stopping
+    constexpr int MIN_SAMPLES = 4000; // 0.25 second minimum
+    constexpr int MAX_TOTAL_FRAMES_MULTIPLIER = 4; // Allow longer recordings
+    constexpr int MIN_SPEECH_FRAMES = 6; // Reduced to 6 frames (120ms) for better single word detection
 
     std::unique_ptr<Fvad, decltype(&fvad_free)> vad{fvad_new(), fvad_free};
     if (!vad) {
         std::cout << "Failed to create VAD\n";
         return false;
     }
-    fvad_set_mode(vad.get(), VAD_MODE); // 3 for more aggressive
+    fvad_set_mode(vad.get(), VAD_MODE); // 2 for moderate detection
 
     if (fvad_set_sample_rate(vad.get(), SAMPLE_RATE) < 0) {
         std::cout << "Invalid VAD sample rate\n";
@@ -155,17 +156,23 @@ bool record_on_vad(const std::string& device, const std::string& wav_path) {
 
     std::vector<short> recorded_samples;
     recorded_samples.reserve(SAMPLE_RATE * MAX_SPEECH_SECONDS);
+    std::vector<short> pre_buffer; // Buffer to store frames before speech detection
+    constexpr int PRE_BUFFER_FRAMES = 10; // Keep 10 frames (200ms) before speech
     int speech_frames = 0;
     int silence_frames = 0;
     bool in_speech = false;
     int max_speech_frames = (SAMPLE_RATE * MAX_SPEECH_SECONDS) / FRAME_LEN;
     int consecutive_speech_frames = 0;
+    int max_consecutive_speech_frames = 0;  // Track maximum consecutive speech
     bool has_real_speech = false; 
 
     std::vector<short> frame(FRAME_LEN);
     constexpr int allowed_silence = MAX_SILENCE_FRAMES;
     constexpr int min_samples = MIN_SAMPLES;
     int total_frames = 0;
+    float total_energy = 0.0f;  // Track audio energy for debugging
+    int energy_frames = 0;
+    
     while (speech_frames < max_speech_frames) {
         int r = snd_pcm_readi(pcm_handle, frame.data(), FRAME_LEN);
         if (r < 0) {
@@ -183,30 +190,56 @@ bool record_on_vad(const std::string& device, const std::string& wav_path) {
             break;
         }
 
+        // Calculate frame energy for debugging
+        float frame_energy = 0.0f;
+        for (int i = 0; i < FRAME_LEN; i++) {
+            frame_energy += static_cast<float>(frame[i] * frame[i]);
+        }
+        frame_energy = std::sqrt(frame_energy / FRAME_LEN);
+        total_energy += frame_energy;
+        energy_frames++;
+
         if (vad_result == 1) {
             consecutive_speech_frames++;
+            max_consecutive_speech_frames = std::max(max_consecutive_speech_frames, consecutive_speech_frames);
+            
             if (!in_speech){
-                //std::cout << "Speech detected, starting recording.\n";
+                std::cout << "Speech detected, starting recording.\n";
                 in_speech = true;
-                has_real_speech = true;
+                // Add pre-buffer content to recorded samples
+                recorded_samples.insert(recorded_samples.end(), pre_buffer.begin(), pre_buffer.end());
+                speech_frames += pre_buffer.size() / FRAME_LEN;
             }
             recorded_samples.insert(recorded_samples.end(), frame.begin(), frame.end());
             speech_frames++;
             silence_frames = 0;
+            
             if (consecutive_speech_frames >= MIN_SPEECH_FRAMES) {
-                has_real_speech = true;
-                //std::cout << "Substantial speech detected (" << consecutive_speech_frames * 20 << "ms continuous)\n";
+                if (!has_real_speech) {
+                    has_real_speech = true;
+                    std::cout << "Substantial speech detected (" << consecutive_speech_frames * 20 << "ms continuous)\n";
+                }
             }
        } else {
-            consecutive_speech_frames = 0;
+            // Only reset consecutive speech frames if we're not in a brief silence gap
+            if (silence_frames == 0) {
+                consecutive_speech_frames = 0;  // Reset only when transitioning from speech to silence
+            }
+            
             if (in_speech) {
                 silence_frames++;
                 if (silence_frames < allowed_silence) {
                     recorded_samples.insert(recorded_samples.end(), frame.begin(), frame.end());
                     speech_frames++;
                 } else {
-                    //std::cout << "Silence after speech, stopping.\n";
+                    std::cout << "NSR:Silence after speech, stopping.\n";
                     break;
+                }
+            } else {
+                // Before speech detection, maintain a circular buffer
+                pre_buffer.insert(pre_buffer.end(), frame.begin(), frame.end());
+                if (pre_buffer.size() > PRE_BUFFER_FRAMES * FRAME_LEN) {
+                    pre_buffer.erase(pre_buffer.begin(), pre_buffer.begin() + FRAME_LEN);
                 }
             }
         }
@@ -217,6 +250,18 @@ bool record_on_vad(const std::string& device, const std::string& wav_path) {
         }
     }
     cleanup_alsa();
+    
+    // Audio quality diagnostics
+    float avg_energy = energy_frames > 0 ? total_energy / energy_frames : 0.0f;
+    std::cout << "Audio diagnostics: avg_energy=" << avg_energy 
+              << ", total_frames=" << total_frames << ", vad_speech_frames=" << speech_frames << std::endl;
+    
+    if (avg_energy < 200.0f) {
+        std::cout << "WARNING: Low audio energy detected. Check microphone volume/gain." << std::endl;
+    } else if (avg_energy > 10000.0f) {
+        std::cout << "WARNING: High audio energy detected. Audio may be clipping." << std::endl;
+    }
+    
     // Enhanced quality checks
     if (recorded_samples.size() < static_cast<size_t>(min_samples)) {
         std::cout << "Discarding: too short (" << recorded_samples.size() / SAMPLE_RATE << "s, need " << min_samples / SAMPLE_RATE << "s minimum)\n";
@@ -228,8 +273,37 @@ bool record_on_vad(const std::string& device, const std::string& wav_path) {
         return false;
     }
    
-    //std::cout << "Recording complete: " << recorded_samples.size() / SAMPLE_RATE << " seconds, " 
-    //          << speech_frames << " speech frames\n";
+    std::cout << "Recording complete: " << static_cast<float>(recorded_samples.size()) / SAMPLE_RATE 
+              << " seconds, " << speech_frames << " speech frames, " 
+              << max_consecutive_speech_frames << " max consecutive speech frames\n";
+
+    // Basic audio normalization to improve recognition
+    if (!recorded_samples.empty()) {
+        // Find peak amplitude
+        short max_amplitude = 0;
+        for (const auto& sample : recorded_samples) {
+            max_amplitude = std::max(max_amplitude, static_cast<short>(std::abs(sample)));
+        }
+        
+        // Normalize if peak is too low (but not if it's near clipping)
+        if (max_amplitude > 0 && max_amplitude < 8000) {
+            float gain = 10000.0f / max_amplitude;  // Increased target level
+            if (gain > 1.0f && gain < 6.0f) { // Allow higher gain for very quiet audio
+                std::cout << "Applying gain normalization: " << gain << "x\n";
+                for (auto& sample : recorded_samples) {
+                    sample = static_cast<short>(std::round(sample * gain));
+                }
+            }
+        }
+        
+        // Simple noise gate to reduce background noise
+        short noise_threshold = max_amplitude * 0.05f; // 5% of peak as noise threshold
+        for (auto& sample : recorded_samples) {
+            if (std::abs(sample) < noise_threshold) {
+                sample = sample * 0.3f; // Reduce noise by 70%
+            }
+        }
+    }
 
     SF_INFO sfinfo{
         .frames = 0,
@@ -332,7 +406,7 @@ InferenceResult ASRThread::runASR() {
 	    result.asr += str;
     }
     std::cout << std::endl;
-
+    
     infer_time = timer.get_time() / 1000.0;               // sec
     audio_length = audio.num_frames / (float)SAMPLE_RATE; // sec
     audio_length = audio_length > (float)CHUNK_LENGTH ? (float)CHUNK_LENGTH : audio_length;

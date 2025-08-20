@@ -26,7 +26,6 @@ BRIGHTSIGN_OS_MAJOR_VERSION=${BRIGHTSIGN_OS_MAJOR_VERSION:-9.1}
 BRIGHTSIGN_OS_MINOR_VERSION=${BRIGHTSIGN_OS_MINOR_VERSION:-52}
 
 
-
 # Parse command line arguments
 while [[ $# -gt 0 ]]; do
     case $1 in
@@ -188,7 +187,7 @@ step1_build_docker_image() {
     # Build SDK in Docker
     if [ ! -f "Dockerfile" ]; then
         print_status "Downloading Dockerfile..."
-        wget --progress=dot:giga https://raw.githubusercontent.com/brightsign/extension-template/refs/heads/main/Dockerfile
+        wget https://raw.githubusercontent.com/brightsign/extension-template/refs/heads/main/Dockerfile
     fi
 
     if ! docker images | grep -q "bsoe-build"; then
@@ -550,7 +549,7 @@ main() {
     if [ -t 0 ]; then
         DOCKER_FLAGS="-it --rm"
     fi
-    
+
     
     if [ "$AUTO_MODE" = true ]; then
         print_status "Running in automatic mode - no prompts"
@@ -559,6 +558,19 @@ main() {
     fi
     
     print_status "Project root: $PROJECT_ROOT"
+    
+    # Validate option combinations
+    if [[ "$WITHOUT_IMAGE" == true && "$WITHOUT_SDK" != true ]]; then
+        print_warning "Warning: --without-image was specified but --without-sdk was not."
+        print_warning "SDK building requires the Docker image. Enabling --without-sdk automatically."
+        WITHOUT_SDK=true
+    fi
+    
+    if [[ "$WITHOUT_IMAGE" == true && "$WITHOUT_MODELS" != true ]]; then
+        print_warning "Warning: --without-image was specified but --without-models was not."
+        print_warning "Model compilation requires Docker images. Enabling --without-models automatically."
+        WITHOUT_MODELS=true
+    fi
     
     # Check architecture
     if [ "$(uname -m)" != "x86_64" ]; then
@@ -582,6 +594,7 @@ main() {
         prompt_continue "We will now download and build the BrightSign OS SDK. This may take several hours."
     else
         print_status "Skipping preparation of docker image as per --without-sdk option"
+
     fi
 
     # Step 2 - Build BrightSign SDK
@@ -617,6 +630,7 @@ main() {
 
     # Step 6 - Package the Extension
     step6_package
+
     
     print_header "BUILD COMPLETE"
     print_status "All steps completed successfully!"
