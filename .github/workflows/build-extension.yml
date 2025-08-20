@@ -112,7 +112,7 @@ jobs:
         if: ${{ inputs.build-sdk == false }}
         run: |
           echo "BUILD_SDK=false" >> "$GITHUB_ENV"
-          aws s3 ls ${{ env.S3_URL }}/sdk/brightsign-x86_64-cobra-toolchain-${{ env.BRIGHTSIGN_OS_VERSION }}.sh && aws s3 cp ${{ env.S3_URL }}/sdk/brightsign-x86_64-cobra-toolchain-${{ env.BRIGHTSIGN_OS_VERSION }}.sh . || (echo "COMPILE_SDK_FLAG=" >> "$GITHUB_ENV") 
+          aws s3 ls ${{ env.S3_URL }}/sdk/brightsign-x86_64-cobra-toolchain-${{ env.BRIGHTSIGN_OS_VERSION }}.sh && aws s3 cp ${{ env.S3_URL }}/sdk/brightsign-x86_64-cobra-toolchain-${{ env.BRIGHTSIGN_OS_VERSION }}.sh . && chmod +x ./brightsign-x86_64-cobra-toolchain-${{ env.BRIGHTSIGN_OS_VERSION }}.sh || (echo "COMPILE_SDK_FLAG=" >> "$GITHUB_ENV") 
 
       - name: Prepare build dir
         uses: actions/checkout@v4
