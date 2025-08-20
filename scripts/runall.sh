@@ -593,15 +593,11 @@ main() {
     fi
 
     # Step 3 - Install BrightSign SDK
-    if [[ "$WITHOUT_SDK" != true ]]; then
-        step3_install_bs_sdk
+    step3_install_bs_sdk
         
-        # Only prompt for models if we're going to compile them
-        if [[ "$WITHOUT_MODELS" != true ]]; then
-            prompt_continue "We will now compile the ONNX models for the Rockchip NPU."
-        fi
-    else
-        print_status "Skipping installation of BrightSign SDK as per --without-sdk option"
+    # Only prompt for models if we're going to compile them
+    if [[ "$WITHOUT_MODELS" != true ]]; then
+         prompt_continue "We will now compile the ONNX models for the Rockchip NPU."
     fi
     
     # Step 4 - Compile models
