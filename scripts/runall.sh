@@ -547,7 +547,7 @@ main() {
     fi
 
     if [ -t 0 ]; then
-        DOCKER_FLAGS="-it --rm"
+        DOCKER_FLAGS="-it"
     fi
 
     
