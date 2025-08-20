@@ -68,41 +68,6 @@ jobs:
           chmod 777 srv
           mkdir build_xt5
 
-#      - name: Check if Docker image exists
-#        id: check-image
-#        run: |
-#          cmd="$(aws ecr describe-images --repository-name ${{ env.DOCKER_IMAGE }} --image-ids imageTag=${{ inputs.bs_os_version }} ||:)"
-#          if [[ -z "$cmd" ]]; then
-#            echo "IMAGE_EXISTS=false" >> "$GITHUB_ENV"
-#          else
-#            echo "IMAGE_EXISTS=true" >> "$GITHUB_ENV"
-#          fi
-#
-#      - name: Get Docker image
-#        if: ${{ env.IMAGE_EXISTS == 'true' }}
-#         run: |
-#          docker pull ${{ steps.login-ecr.outputs.registry }}/${{ env.DOCKER_IMAGE }}:${{ env.BRIGHTSIGN_OS_VERSION }}
-#
-#      - name: Set up Docker Buildx
-#        if: ${{ env.IMAGE_EXISTS == 'false' }}
-#        uses: docker/setup-buildx-action@v3
-#
-#      - name: Build Docker image
-#        if: ${{ env.IMAGE_EXISTS == 'false' }}
-#        id: dockerbuild
-#        uses: docker/build-push-action@v6
-#        with:
-#          build-args: |
-#              BRIGHTSIGN_OS_VERSION=${{ env.BRIGHTSIGN_OS_VERSION }}
-#          file: ./Dockerfile
-#          tags: ${{ steps.login-ecr.outputs.registry }}/${{ env.DOCKER_IMAGE }}:${{ env.BRIGHTSIGN_OS_VERSION }}
-#          load: true
-#          push: true      
-#
-#      - name: Tag Docker image
-#        run: |
-#          docker tag ${{ steps.login-ecr.outputs.registry }}/${{ env.DOCKER_IMAGE }}:${{ env.BRIGHTSIGN_OS_VERSION }} ${{ env.DOCKER_IMAGE }}
-
       - name: Download models
         if: ${{ inputs.build-models == false }}
         run: |
@@ -123,8 +88,7 @@ jobs:
 
       - name: Run build script
         run: |
-          #./scripts/runall.sh -y ${{ env.COMPILE_MODELS_FLAG }} ${{ env.COMPILE_SDK_FLAG }} --version ${{ inputs.bs_os_version }}
-          ./scripts/runall.sh -y --without-clean --version ${{ inputs.bs_os_version }}
+          ./scripts/runall.sh -y ${{ env.COMPILE_MODELS_FLAG }} ${{ env.COMPILE_SDK_FLAG }} --without-clean --version ${{ inputs.bs_os_version }}
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -140,8 +104,7 @@ jobs:
           aws s3 cp install-models.tgz ${{ env.S3_URL }}/models/install-models.tgz
 
       - name: Upload SDK to S3
-        #if: env.BUILD_SDK != 'false'
-        if: always()
+        if: env.BUILD_SDK != 'false'
         run: |
           aws s3 cp ./brightsign-x86_64-cobra-toolchain-${{ env.BRIGHTSIGN_OS_VERSION }}.sh ${{ env.S3_URL }}/sdk/ 
 

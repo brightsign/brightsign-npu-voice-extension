@@ -53,9 +53,6 @@ while [[ $# -gt 0 ]]; do
         --minor)
             BRIGHTSIGN_OS_MINOR_VERSION="$2"; shift 2 
             ;;
-        --without-image)
-            WITHOUT_IMAGE=true; shift 
-            ;;
         --without-models)
             WITHOUT_MODELS=true; shift 
             ;;
@@ -75,7 +72,6 @@ while [[ $# -gt 0 ]]; do
             echo "  --major VERSION        Set major.minor version (e.g., 9.1)"
             echo "  --minor VERSION        Set minor version number (e.g., 52)"
             echo "  --without-clean        Don't remove build_xxx folders"
-            echo "  --without-image        Don't build the Docker image"
             echo "  --without-models       Don't prepare toolkit for building models"
             echo "  --without-sdk          Don't build the SDK"
             echo "  --clean                Clean all build artifacts and downloaded files"
@@ -564,19 +560,6 @@ main() {
     
     print_status "Project root: $PROJECT_ROOT"
     
-    # Validate option combinations
-    if [[ "$WITHOUT_IMAGE" == true && "$WITHOUT_SDK" != true ]]; then
-        print_warning "Warning: --without-image was specified but --without-sdk was not."
-        print_warning "SDK building requires the Docker image. Enabling --without-sdk automatically."
-        WITHOUT_SDK=true
-    fi
-    
-    if [[ "$WITHOUT_IMAGE" == true && "$WITHOUT_MODELS" != true ]]; then
-        print_warning "Warning: --without-image was specified but --without-models was not."
-        print_warning "Model compilation requires Docker images. Enabling --without-models automatically."
-        WITHOUT_MODELS=true
-    fi
-    
     # Check architecture
     if [ "$(uname -m)" != "x86_64" ]; then
         print_error "This script requires x86_64 architecture"
@@ -589,16 +572,16 @@ main() {
     step0_setup
     
     # Only prompt for Docker image build if we're actually going to build it
-    if [[ "$WITHOUT_IMAGE" != true ]]; then
+    if [[ "$WITHOUT_SDK" != true ]]; then
         prompt_continue "We will now build the Docker image for the BrightSign OS development environment."
     fi
 
     # Step 1 - Build Docker Image
-    if [[ "$WITHOUT_IMAGE" != true ]]; then
+    if [[ "$WITHOUT_SDK" != true ]]; then
         step1_build_docker_image
         prompt_continue "We will now download and build the BrightSign OS SDK. This may take several hours."
     else
-        print_status "Skipping preparation of docker image as per --without-image option"
+        print_status "Skipping preparation of docker image as per --without-sdk option"
     fi
 
     # Step 2 - Build BrightSign SDK
@@ -634,19 +617,10 @@ main() {
     fi
 
     # Step 5 - Build app for XT5
-    if [[ "$WITHOUT_SDK" != true ]]; then
-        step5_build_xt5
-        prompt_continue "We will now package the extension for deployment."
-    else
-        print_status "Skipping build for XT5 as per --without-sdk option"
-    fi
+    step5_build_xt5
 
     # Step 6 - Package the Extension
-    if [[ "$WITHOUT_SDK" != true ]]; then
-        step6_package
-    else
-        print_status "Skipping packaging as per --without-sdk option"
-    fi
+    step6_package
     
     print_header "BUILD COMPLETE"
     print_status "All steps completed successfully!"
