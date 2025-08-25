@@ -1,12 +1,6 @@
-# BrightSign Voice Detection Extension
+# BrightSign Voice Detection Extension BSMP
 
-**Automated Voice detection extension for BrightSign Series 5 players using Rockchip NPU acceleration.**
-
-## Release Status
-
-This is an **ALPHA** quality release, intended mostly for educational purposes. This model is not tuned for optimum performance and has had only standard testing.  **NOT RECOMMENDED FOR PRODUCTION USE**.
-
-## Description
+**Example: Automated Voice detection extension for BrightSign Series 5 players using Rockchip NPU acceleration.**
 
 This project provides a complete automated build system for BrightSign extensions that combine:
 
@@ -15,6 +9,24 @@ This project provides a complete automated build system for BrightSign extension
 **Whisper encoder-decoder voice recognition** - Gaze detection triggers audio capture and runs the Whisper model to transcribe speech to text in real-time when users speak.
 
 **NPU acceleration** - runs both AI models simultaneously on NPU.
+
+## Use It vs. Build It
+
+If you just want to use this BSMP extension but don't want to build it, you can just download it.
+
+* [cobra-standalone-npu_voice-0.1.0.bsfw](https://github.com/brightsign/brightsign-npu-voice-extension/releases/download/v0.1.0-alpha/cobra-standalone-npu_voice-0.1.0.bsfw)
+
+It can be installed just like any other BrightSign firmware upgrade:  copy it to an SD card and boot the player with that card inserted.
+
+## Pracical Real-World Example
+
+A [simple HTML application](https://github.com/brightsign/simple-voice-detection-html) demonstrating the voice detection BSMP is available for demonstration purposes.
+
+## Release Status
+
+This is an **ALPHA** quality release, intended mostly for educational purposes. This model is not tuned for optimum performance and has had only standard testing.  **NOT RECOMMENDED FOR PRODUCTION USE**.
+
+# Building the BSMP Extension
 
 ## 🚀 Quick Start (Complete Automated Workflow)
 
