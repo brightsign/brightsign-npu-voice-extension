@@ -15,10 +15,10 @@ NC='\033[0m' # No Color
 # Global variables
 AUTO_MODE=false
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-WITHOUT_CLEAN=false
-WITHOUT_IMAGE=false
-WITHOUT_SDK=false
-WITHOUT_MODELS=false
+SKIP_CLEAN=false
+SKIP_IMAGE=false
+SKIP_SDK=false
+SKIP_MODELS=false
 CLEAN_MODE=false
 DOCKER_FLAGS=""
 
@@ -52,14 +52,14 @@ while [[ $# -gt 0 ]]; do
         --minor)
             BRIGHTSIGN_OS_MINOR_VERSION="$2"; shift 2 
             ;;
-        --without-models)
-            WITHOUT_MODELS=true; shift 
+        --skip-models)
+            SKIP_MODELS=true; shift 
             ;;
-        --without-sdk)
-            WITHOUT_SDK=true; shift 
+        --skip-sdk)
+            SKIP_SDK=true; shift 
             ;;
-        --without-clean)
-            WITHOUT_CLEAN=true; shift
+        --skip-clean)
+            SKIP_CLEAN=true; shift
             ;;	    
         -c|--clean)
             CLEAN_MODE=true; shift 
@@ -70,9 +70,9 @@ while [[ $# -gt 0 ]]; do
             echo "  -v, --version VERSION  Set BrightSign OS version (e.g., 9.1.52)"
             echo "  --major VERSION        Set major.minor version (e.g., 9.1)"
             echo "  --minor VERSION        Set minor version number (e.g., 52)"
-            echo "  --without-clean        Don't remove build_xxx folders"
-            echo "  --without-models       Don't prepare toolkit for building models"
-            echo "  --without-sdk          Don't build the SDK"
+            echo "  --skip-clean           Don't remove build_xxx folders"
+            echo "  --skip-models          Don't prepare toolkit for building models"
+            echo "  --skip-sdk             Don't build the SDK"
             echo "  --clean                Clean all build artifacts and downloaded files"
             exit 0
             ;;
@@ -368,7 +368,7 @@ step5_build_xt5() {
 
     # Build for XT5 (RK3588)
     print_status "Building for XT5 (RK3588)..."
-    if [[ "$WITHOUT_CLEAN" != true ]]; then
+    if [[ "$SKIP_CLEAN" != true ]]; then
       rm -rf build_xt5
     fi
     mkdir -p build_xt5 && cd build_xt5
@@ -560,16 +560,16 @@ main() {
     print_status "Project root: $PROJECT_ROOT"
     
     # Validate option combinations
-    if [[ "$WITHOUT_IMAGE" == true && "$WITHOUT_SDK" != true ]]; then
-        print_warning "Warning: --without-image was specified but --without-sdk was not."
-        print_warning "SDK building requires the Docker image. Enabling --without-sdk automatically."
-        WITHOUT_SDK=true
+    if [[ "$SKIP_IMAGE" == true && "$SKIP_SDK" != true ]]; then
+        print_warning "Warning: --skip-image was specified but --skip-sdk was not."
+        print_warning "SDK building requires the Docker image. Enabling --skip-sdk automatically."
+        SKIP_SDK=true
     fi
-    
-    if [[ "$WITHOUT_IMAGE" == true && "$WITHOUT_MODELS" != true ]]; then
-        print_warning "Warning: --without-image was specified but --without-models was not."
-        print_warning "Model compilation requires Docker images. Enabling --without-models automatically."
-        WITHOUT_MODELS=true
+
+    if [[ "$SKIP_IMAGE" == true && "$SKIP_MODELS" != true ]]; then
+        print_warning "Warning: --skip-image was specified but --skip-models was not."
+        print_warning "Model compilation requires Docker images. Enabling --skip-models automatically."
+        SKIP_MODELS=true
     fi
     
     # Check architecture
@@ -584,45 +584,45 @@ main() {
     step0_setup
     
     # Only prompt for Docker image build if we're actually going to build it
-    if [[ "$WITHOUT_SDK" != true ]]; then
+    if [[ "$SKIP_SDK" != true ]]; then
         prompt_continue "We will now build the Docker image for the BrightSign OS development environment."
     fi
 
     # Step 1 - Build Docker Image
-    if [[ "$WITHOUT_SDK" != true ]]; then
+    if [[ "$SKIP_SDK" != true ]]; then
         step1_build_docker_image
         prompt_continue "We will now download and build the BrightSign OS SDK. This may take several hours."
     else
-        print_status "Skipping preparation of docker image as per --without-sdk option"
+        print_status "Skipping preparation of docker image as per --skip-sdk option"
 
     fi
 
     # Step 2 - Build BrightSign SDK
-    if [[ "$WITHOUT_SDK" != true ]]; then
+    if [[ "$SKIP_SDK" != true ]]; then
         step2_build_bs_sdk
         prompt_continue "We will now install the BrightSign OS SDK."
     else
-        print_status "Skipping preparation of BrightSign SDK as per --without-sdk option"
+        print_status "Skipping preparation of BrightSign SDK as per --skip-sdk option"
     fi
 
     # Step 3 - Install BrightSign SDK
     step3_install_bs_sdk
         
     # Only prompt for models if we're going to compile them
-    if [[ "$WITHOUT_MODELS" != true ]]; then
+    if [[ "$SKIP_MODELS" != true ]]; then
          prompt_continue "We will now compile the ONNX models for the Rockchip NPU."
     fi
     
     # Step 4 - Compile models
-    if [[ "$WITHOUT_MODELS" != true ]]; then
+    if [[ "$SKIP_MODELS" != true ]]; then
         step4_compile_models
         
         # Only prompt for build if we're going to build
-        if [[ "$WITHOUT_SDK" != true ]]; then
+        if [[ "$SKIP_SDK" != true ]]; then
             prompt_continue "We will now build the application for XT5 players."
         fi
     else
-        print_status "Skipping preparation of models toolkit as per --without-models option"
+        print_status "Skipping preparation of models toolkit as per --skip-models option"
     fi
 
     # Step 5 - Build app for XT5
@@ -634,15 +634,11 @@ main() {
     
     print_header "BUILD COMPLETE"
     print_status "All steps completed successfully!"
-    
-    if [[ "$WITHOUT_SDK" != true ]]; then
-        print_status "Check the install directory for the built files"
-        print_status "Development package: voice-dev-*.zip"
-        print_status "Production extension: voice-ext-*.zip"
-        print_warning "Don't forget to unsecure your BrightSign player as described in the README!"
-    else
-        print_status "SDK-dependent steps were skipped. Only setup and model compilation were performed."
-    fi
+
+    print_status "Check the install directory for the built files"
+    print_status "Development package: voice-dev-*.zip"
+    print_status "Production extension: voice-ext-*.zip"
+    print_warning "Don't forget to unsecure your BrightSign player as described in the README!"
 }
 
 # Run main function

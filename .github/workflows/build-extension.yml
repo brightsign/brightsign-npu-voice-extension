@@ -55,13 +55,13 @@ jobs:
           if [[ "${{ github.event.inputs.build-models }}" == "true" ]] || [[ "${{ env.COMPILE_MODELS }}" == "true" ]]; then
             echo "COMPILE_MODELS_FLAG=" >> "$GITHUB_ENV"
           else
-            echo "COMPILE_MODELS_FLAG=--without-models" >> "$GITHUB_ENV"
+            echo "COMPILE_MODELS_FLAG=--skip-models" >> "$GITHUB_ENV"
           fi
 
           if [[ "${{ github.event.inputs.build-sdk }}" == "true" ]] || [[ "${{ env.BUILD_SDK }}" == "true" ]]; then
             echo "COMPILE_SDK_FLAG=" >> "$GITHUB_ENV"
           else
-            echo "COMPILE_SDK_FLAG=--without-sdk" >> "$GITHUB_ENV"
+            echo "COMPILE_SDK_FLAG=--skip-sdk" >> "$GITHUB_ENV"
           fi
 
           mkdir -p srv
@@ -88,7 +88,7 @@ jobs:
 
       - name: Run build script
         run: |
-          ./scripts/runall.sh -y ${{ env.COMPILE_MODELS_FLAG }} ${{ env.COMPILE_SDK_FLAG }} --without-clean --version ${{ inputs.bs_os_version }}
+          ./scripts/runall.sh -y ${{ env.COMPILE_MODELS_FLAG }} ${{ env.COMPILE_SDK_FLAG }} --skip-clean --version ${{ inputs.bs_os_version }}
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
