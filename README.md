@@ -10,25 +10,34 @@ This project provides a complete automated build system for BrightSign extension
 
 **NPU acceleration** - runs both AI models simultaneously on NPU.
 
+> **Looking for a complete solution?**
+> [**Argus**](https://github.com/brightsign/argus-audience-measurement-extension) is BrightSign's
+> reference audience-measurement application: person counting, gaze detection, dwell time,
+> entry/exit events, and movement analytics, published over MQTT and Prometheus. This repository
+> is a single-purpose example of one piece of that system.
+>
+> *Argus covers vision analytics; this extension covers speech.*
+
 ## Use It vs. Build It
 
 If you just want to use this BSMP extension but don't want to build it, you can just download it.
 
-* [cobra-standalone-npu_voice-0.1.0.bsfw](https://github.com/brightsign/brightsign-npu-voice-extension/releases/download/v0.1.0-alpha/cobra-standalone-npu_voice-0.1.0.bsfw)
+* [Download the latest release](https://github.com/brightsign/brightsign-npu-voice-extension/releases/latest)
 
 It can be installed just like any other BrightSign firmware upgrade:  copy it to an SD card and boot the player with that card inserted.
 
-## Pracical Real-World Example
+## Practical Real-World Example
 
 A [simple HTML application](https://github.com/brightsign/simple-voice-detection-html) demonstrating the voice detection BSMP is available for demonstration purposes.
 
 ## Release Status
 
-This is an **ALPHA** quality release, intended mostly for educational purposes. This model is not tuned for optimum performance and has had only standard testing.  **NOT RECOMMENDED FOR PRODUCTION USE**.
+**ALPHA.** Educational use only — not recommended for production. This model is not tuned for
+optimum performance and has had only standard testing. Interfaces may change without notice.
 
 ## Image Streamer Included
 
-For test and debug purposes only, we have included a debug and test tool.  You can access a web page on the player to "see" what the output of the AI model is visually.  It will show "bounding boxes" around objects of interest.  This is started automatically and can be accessed at http://<player ip>:20200 by default.
+For test and debug purposes only, we have included a debug and test tool.  You can access a web page on the player to "see" what the output of the AI model is visually.  It will show "bounding boxes" around objects of interest.  This is started automatically and can be accessed at http://<PLAYER_IP>:20200 by default.
 
 For more information, please see the [tool documentation](https://github.com/brightsign/bs-image-stream-server).
 
@@ -43,7 +52,7 @@ __Total Time__: 60-90 minutes | __Prerequisites__: Docker, git, x86_64 Linux hos
 
 ```bash
 # Clone the repository (1-2 minutes)
-git clone <repository-url>
+git clone git@github.com:brightsign/brightsign-npu-voice-extension.git
 cd brightsign-npu-voice-extension
 
 # This script automates the entire build process for the BrightSign NPU Voice Extension. This script
@@ -175,7 +184,7 @@ Enable or disable the image stream server using the registry options:
 | Port Value | Behavior |
 |------------|----------|
 | `0` | __Disabled__ - Image stream server is turned off (recommended for this extension) |
-| `20200` | __Default__ - Serves camera feed at `http://player-ip:20200/image_stream.jpg` |
+| `20200` | __Default__ - Serves camera feed at `http://<PLAYER_IP>:20200/image_stream.jpg` |
 
 **Usage Examples:**
 
@@ -290,7 +299,7 @@ reboot  # Extension auto-starts after reboot
 
 For faster iteration during development, consider using Orange Pi boards:
 
-__📋 See [OrangePI_Development.md](OrangePI_Development.md) for complete development guide__
+__📋 See [OrangePI_Development.md](https://github.com/brightsign/brightsign-npu-gaze-extension/blob/main/OrangePI_Development.md) for complete development guide__
 
 Benefits:
 
